@@ -98,3 +98,18 @@ rsync -av deploy@SERVER_IP:/srv/backups/redart/ ~/redart-backups/
 ```
 
 Test a restore once after launch, so you know it works before you need it.
+
+## Sharing a server with another app (how the Contabo VPS is set up)
+
+On the current VPS, another app (TajStore, in `/opt/tajstore`) already runs a Caddy that owns ports 80/443. So Redart uses `deploy/docker-compose.behind-proxy.yml`:
+
+- **No Caddy and no published ports.** `redart-web` and `redart-api` join TajStore's Docker network (`PROXY_NETWORK=tajstore_default`) under names that can't clash with TajStore's services. `redart-db` stays on Redart's private network.
+- **Routing.** TajStore's `Caddyfile` has an extra site block that sends `redart.169-58-96-52.sslip.io` to those containers.
+- **The block must stay in TajStore's repo.** TajStore's deploy script rsyncs its Caddyfile, so the block lives in that repo (`store-management-system`, branch `chore/share-caddy-with-redart`). Merge it there, or the next TajStore deploy removes Redart's route.
+- **How settings are chosen.**
+  - On the server, logging in as `redart` (`ssh redart@169.58.96.52`), `/srv/redart/.env` holds `COMPOSE_FILE_NAME`, `DB_SERVICE`, `API_SERVICE` and `WEB_SERVICE`. The backup and restore scripts read the service names from there.
+  - On your machine, `.env.deploy` sets `COMPOSE_FILE_NAME=docker-compose.behind-proxy.yml`, which tells `deploy.sh` which file to use.
+- **Applying a Caddy change without downtime.** TajStore's Caddy mounts its Caddyfile as a single file, and file-replacing tools (rsync, editors) leave the running container on the old copy. Validate and hot-reload from a copy instead:
+  ```bash
+  docker exec -i tajstore-caddy-1 sh -c 'cat > /tmp/Caddyfile.new && caddy validate --config /tmp/Caddyfile.new --adapter caddyfile && caddy reload --config /tmp/Caddyfile.new --adapter caddyfile' < /opt/tajstore/Caddyfile
+  ```
