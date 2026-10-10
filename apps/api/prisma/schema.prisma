@@ -1,0 +1,319 @@
+// Redart data model. See CLAUDE.md §5. Calendar days are @db.Date and travel as "YYYY-MM-DD".
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum LinkStatus {
+  OK
+  BROKEN
+  RESTRICTED
+  UNREACHABLE
+  TIMEOUT
+  INVALID
+  BLOCKED
+}
+
+enum ActivityKind {
+  FINISHED
+  FAVORITED
+  RECOMMENDED
+  JOINED_CHALLENGE
+  STARTED_PLAN
+}
+
+enum ChallengeAccess {
+  PUBLIC
+  INVITE
+}
+
+enum NotificationKind {
+  NEW_FOLLOWER
+  FOLLOW_REQUEST
+  FOLLOW_ACCEPTED
+  RECOMMENDATION
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique // lowercased
+  handle       String     @unique // lowercased
+  displayName  String
+  bio          String     @default("")
+  passwordHash String
+  visibility   Visibility @default(PUBLIC)
+  topics       String[]   @default([])
+  isAdmin      Boolean    @default(false)
+  activePlanId String?    @db.Uuid
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  sessions        Session[]
+  passwordResets  PasswordReset[]
+  plans           Plan[]
+  favorites       Favorite[]
+  following       Follow[]               @relation("follower")
+  followers       Follow[]               @relation("followee")
+  blocking        Block[]                @relation("blocker")
+  blockedBy       Block[]                @relation("blocked")
+  activity        Activity[]
+  sentRecs        Recommendation[]       @relation("recFrom")
+  receivedRecs    Recommendation[]       @relation("recTo")
+  notifications   Notification[]         @relation("notifyUser")
+  causedNotices   Notification[]         @relation("notifyActor")
+  challenges      Challenge[]
+  participations  ChallengeParticipant[]
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Follow {
+  followerId String       @db.Uuid
+  followeeId String       @db.Uuid
+  follower   User         @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee   User         @relation("followee", fields: [followeeId], references: [id], onDelete: Cascade)
+  status     FollowStatus
+  createdAt  DateTime     @default(now())
+
+  @@id([followerId, followeeId])
+  @@index([followeeId, status])
+}
+
+model Block {
+  blockerId String   @db.Uuid
+  blockedId String   @db.Uuid
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+}
+
+/// Shared cache of link checks, keyed by the normalised URL.
+model Link {
+  urlKey     String     @id
+  url        String
+  title      String?
+  minutes    Int?
+  words      Int?
+  status     LinkStatus
+  httpStatus Int?
+  message    String     @default("")
+  checkedAt  DateTime
+}
+
+model Plan {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @db.Uuid
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  start              DateTime  @db.Date
+  days               Int
+  visibleToFollowers Boolean   @default(true)
+  challengeId        String?   @db.Uuid
+  challenge          Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  trackId            String?   @db.Uuid
+  track              ChallengeTrack? @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  articles     Article[]
+  activity     Activity[]
+  participant  ChallengeParticipant?
+
+  @@index([userId])
+}
+
+model Article {
+  id             String      @id @default(uuid()) @db.Uuid
+  planId         String      @db.Uuid
+  plan           Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  url            String      @default("")
+  urlKey         String?
+  title          String
+  topic          String      @default("")
+  minutes        Int
+  minutesAuto    Boolean     @default(false)
+  due            DateTime    @db.Date
+  done           Boolean     @default(false)
+  doneAt         DateTime?   @db.Date
+  notes          String      @default("")
+  position       Int
+  linkStatus     LinkStatus?
+  linkHttpStatus Int?
+  linkMessage    String      @default("")
+  linkCheckedAt  DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([planId, position])
+}
+
+model Favorite {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleKey String
+  url        String   @default("")
+  title      String
+  topic      String   @default("")
+  minutes    Int
+  savedAt    DateTime @db.Date
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, articleKey])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Recommendation {
+  id         String    @id @default(uuid()) @db.Uuid
+  fromUserId String    @db.Uuid
+  from       User      @relation("recFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  /// null = shared with all followers (shows in their feed)
+  toUserId   String?   @db.Uuid
+  to         User?     @relation("recTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  url        String
+  title      String
+  minutes    Int?
+  message    String    @default("")
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  notifications Notification[]
+
+  @@index([toUserId, createdAt(sort: Desc)])
+  @@index([fromUserId, createdAt(sort: Desc)])
+}
+
+model Notification {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @db.Uuid
+  user             User             @relation("notifyUser", fields: [userId], references: [id], onDelete: Cascade)
+  kind             NotificationKind
+  actorId          String           @db.Uuid
+  actor            User             @relation("notifyActor", fields: [actorId], references: [id], onDelete: Cascade)
+  recommendationId String?          @db.Uuid
+  recommendation   Recommendation?  @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  readAt           DateTime?
+  createdAt        DateTime         @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Challenge {
+  id          String          @id @default(uuid()) @db.Uuid
+  slug        String          @unique
+  title       String
+  description String          @default("")
+  start       DateTime        @db.Date
+  days        Int
+  topics      String[]        @default([])
+  createdById String          @db.Uuid
+  createdBy   User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  access      ChallengeAccess @default(PUBLIC)
+  inviteCode  String?         @unique
+  featured    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  tracks       ChallengeTrack[]
+  articles     ChallengeArticle[]
+  participants ChallengeParticipant[]
+  plans        Plan[]
+
+  @@index([start])
+}
+
+model ChallengeTrack {
+  id             String    @id @default(uuid()) @db.Uuid
+  challengeId    String    @db.Uuid
+  challenge      Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  key            String
+  name           String
+  description    String    @default("")
+  targetArticles Int?
+  targetMinutes  Int?
+  position       Int       @default(0)
+
+  plans        Plan[]
+  participants ChallengeParticipant[]
+
+  @@unique([challengeId, key])
+}
+
+model ChallengeArticle {
+  id          String    @id @default(uuid()) @db.Uuid
+  challengeId String    @db.Uuid
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  position    Int
+  url         String
+  title       String
+  topic       String    @default("")
+  minutes     Int?
+
+  @@index([challengeId, position])
+}
+
+model ChallengeParticipant {
+  challengeId       String         @db.Uuid
+  challenge         Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId            String         @db.Uuid
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId           String         @db.Uuid
+  track             ChallengeTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  planId            String         @unique @db.Uuid
+  plan              Plan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  showOnLeaderboard Boolean        @default(false)
+  joinedAt          DateTime       @default(now())
+
+  @@id([challengeId, userId])
+}
+
+model Activity {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @db.Uuid
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      ActivityKind
+  /// url, title, minutes, challenge slug… never notes
+  payload   Json
+  /// so hiding a plan hides its activity
+  planId    String?      @db.Uuid
+  plan      Plan?        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}

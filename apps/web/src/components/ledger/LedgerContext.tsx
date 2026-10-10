@@ -1,13 +1,16 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   activePlan, articleKey, articlesFromRows, diffDays, favoriteFromArticle, LIMITS, newArticle, nextDueDate, planEnd, planStats,
-  spread, STARTER, uid, type Article, type Favorite, type ISODate, type LedgerState, type Plan,
+  sanitizeState, spread, STARTER, todayISO, uid,
+  type Article, type Favorite, type ImportResult, type ISODate, type LedgerState, type Me, type Plan,
 } from "@redart/shared";
 import { useLedger } from "@/lib/hooks/useLedger";
 import { useLinkChecker } from "@/lib/hooks/useLinkChecker";
 import { useToday } from "@/lib/hooks/useEnvironment";
-import { LocalStore } from "@/lib/store/local";
+import { LEDGER_KEY, LocalStore } from "@/lib/store/local";
+import { RemoteStore } from "@/lib/store/remote";
+import { api, ApiError } from "@/lib/api";
 import type { StoreProblem } from "@/lib/store/types";
 import { fmtDate, plural, short } from "@/lib/format";
 import { linkChecksUnavailable } from "@/lib/inspect";
@@ -15,7 +18,15 @@ import { useToast } from "../Toast";
 
 export type PlanSeed = "empty" | "carry" | "favorites" | "starter";
 
+export interface GuestLedgerSummary { plans: number; articles: number }
+
 export interface LedgerApi {
+  /** The signed-in member, or null for a guest whose ledger lives in this browser. */
+  member: Me | null;
+  /** A guest ledger on this device that a member hasn't brought into their account yet. */
+  guestLedger: GuestLedgerSummary | null;
+  importGuestLedger(): Promise<void>;
+  dismissGuestLedger(): void;
   state: LedgerState;
   plan: Plan;
   today: ISODate;
@@ -48,15 +59,42 @@ export function useLedgerApi(): LedgerApi {
   return v;
 }
 
-function guestStore() {
-  let storage: Storage | null = null;
-  try { storage = window.localStorage; } catch { /* blocked by the browser */ }
-  return new LocalStore(storage, window);
+function browserStorage(): Storage | null {
+  try { return window.localStorage; } catch { return null; } // blocked by the browser
 }
 
+const importDoneKey = (userId: string) => `redart:imported:${userId}`;
+
+/** The guest ledger saved on this device, if it holds anything worth importing. */
+export function readGuestLedger(): { raw: unknown; summary: GuestLedgerSummary } | null {
+  try {
+    const raw = JSON.parse(browserStorage()?.getItem(LEDGER_KEY) ?? "null");
+    const s = sanitizeState(raw, todayISO());
+    if (!s) return null;
+    const articles = s.plans.reduce((n, p) => n + p.articles.length, 0);
+    return articles || s.favorites.length ? { raw, summary: { plans: s.plans.length, articles } } : null;
+  } catch { return null; }
+}
+
+/** Bring this device's guest ledger into the signed-in account. Safe to run twice. */
+export async function importGuestLedgerNow(userId: string): Promise<ImportResult | null> {
+  const guest = readGuestLedger();
+  if (!guest) return null;
+  const result = await api<ImportResult>(`/api/me/import?today=${todayISO()}`, { body: { state: guest.raw } });
+  try { browserStorage()?.setItem(importDoneKey(userId), new Date().toISOString()); } catch { /* ignore */ }
+  return result;
+}
+
+interface ProviderProps { member: Me | null; children: ReactNode; fallback: ReactNode }
+
 /** Loads the ledger and provides every action the ledger UI needs. Renders `fallback` until loaded. */
-export function LedgerProvider({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
-  const { state, current, dispatch, problem } = useLedger(guestStore);
+export function LedgerProvider({ member, children, fallback }: ProviderProps) {
+  const memberId = member?.id ?? null;
+  const makeStore = useCallback(
+    () => (memberId ? new RemoteStore(memberId, browserStorage()) : new LocalStore(browserStorage(), window)),
+    [memberId],
+  );
+  const { state, current, dispatch, problem, loadError, retry, store } = useLedger(makeStore);
   const today = useToday();
   const toast = useToast();
   const { checking, queueCheck, checkStale } = useLinkChecker(current, dispatch);
@@ -72,6 +110,34 @@ export function LedgerProvider({ children, fallback }: { children: ReactNode; fa
   }, [checkStale]);
   useEffect(() => { if (activeId) checkPlanOnce(activeId); }, [activeId, checkPlanOnce]);
 
+  // Offer to import a guest ledger left on this device, once per member.
+  const [guestLedger, setGuestLedger] = useState<GuestLedgerSummary | null>(null);
+  useEffect(() => {
+    if (!memberId) return;
+    let done = false;
+    try { done = !!browserStorage()?.getItem(importDoneKey(memberId)); } catch { /* ignore */ }
+    // Reading localStorage can only happen after mount, so this effect is where the offer appears.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!done) setGuestLedger(readGuestLedger()?.summary ?? null);
+  }, [memberId]);
+
+  const importGuestLedger = useCallback(async () => {
+    if (!memberId) return;
+    try {
+      const r = await importGuestLedgerNow(memberId);
+      setGuestLedger(null);
+      await (store() as RemoteStore | null)?.reload?.();
+      if (r) toast(`Added ${plural(r.articlesAdded, "article")}${r.plansCreated ? ` in ${plural(r.plansCreated, "new plan")}` : ""}${r.favoritesAdded ? ` and ${plural(r.favoritesAdded, "favourite")}` : ""} to your account.`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn't import right now. Try again in a moment.");
+    }
+  }, [memberId, store, toast]);
+
+  const dismissGuestLedger = useCallback(() => {
+    if (memberId) try { browserStorage()?.setItem(importDoneKey(memberId), "dismissed"); } catch { /* ignore */ }
+    setGuestLedger(null);
+  }, [memberId]);
+
   const plan = state ? activePlan(state) : null;
   const favKeys = useMemo(() => new Set(state?.favorites.map(articleKey) ?? []), [state?.favorites]);
 
@@ -81,9 +147,10 @@ export function LedgerProvider({ children, fallback }: { children: ReactNode; fa
     return s ? fn(s, activePlan(s)) : undefined;
   }, [current]);
 
-  const api = useMemo((): LedgerApi | null => {
+  const value = useMemo((): LedgerApi | null => {
     if (!state || !plan) return null;
     return {
+      member, guestLedger, importGuestLedger, dismissGuestLedger,
       state, plan, today, problem, checking, favKeys,
 
       selectPlan: (id) => dispatch({ type: "plan.select", planId: id }),
@@ -173,7 +240,10 @@ export function LedgerProvider({ children, fallback }: { children: ReactNode; fa
         if (a.url) queueCheck(p.id, a.id);
       }),
 
-      move: (index, delta) => withState((_s, p) => dispatch({ type: "article.swap", planId: p.id, from: index, to: index + delta })),
+      move: (index, delta) => withState((_s, p) => {
+        const a = p.articles[index];
+        if (a) dispatch({ type: "article.move", planId: p.id, articleId: a.id, to: index + delta });
+      }),
 
       removeArticle: (id) => withState((_s, p) => {
         const index = p.articles.findIndex((a) => a.id === id);
@@ -208,10 +278,18 @@ export function LedgerProvider({ children, fallback }: { children: ReactNode; fa
         toast("Backup restored", () => dispatch({ type: "state.replace", state: s }));
       }),
     };
-  }, [state, plan, today, problem, checking, favKeys, dispatch, withState, current, toast, queueCheck, checkPlanOnce]);
+  }, [member, guestLedger, importGuestLedger, dismissGuestLedger, state, plan, today, problem, checking, favKeys, dispatch, withState, current, toast, queueCheck, checkPlanOnce]);
 
-  // The callbacks inside `api` read refs only when called from event handlers, never during render.
+  // The callbacks inside `value` read refs only when called from event handlers, never during render.
+  if (loadError) {
+    return (
+      <div className="quiet" role="alert">
+        <p>{loadError}</p>
+        <button className="btn" type="button" onClick={retry}>Try again</button>
+      </div>
+    );
+  }
   // eslint-disable-next-line react-hooks/refs
-  if (!api) return <>{fallback}</>;
-  return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
+  if (!value) return <>{fallback}</>;
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

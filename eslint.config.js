@@ -5,7 +5,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 const WEB = ["apps/web/**/*.{ts,tsx}"];
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/next-env.d.ts", "**/playwright-report/**", "**/test-results/**"] },
+  { ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/next-env.d.ts", "**/playwright-report/**", "**/test-results/**", "**/src/generated/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   // Next.js, React and accessibility rules, for the web app only.

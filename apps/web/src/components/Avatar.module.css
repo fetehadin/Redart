@@ -1,0 +1,6 @@
+.avatar {
+  display: inline-grid; place-items: center; border-radius: 50%; flex: none; font-weight: 700; letter-spacing: .02em;
+  background: hsl(var(--hue) 30% 86%); color: hsl(var(--hue) 45% 26%);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .avatar { background: hsl(var(--hue) 22% 26%); color: hsl(var(--hue) 40% 84%); } }
+:root[data-theme="dark"] .avatar { background: hsl(var(--hue) 22% 26%); color: hsl(var(--hue) 40% 84%); }

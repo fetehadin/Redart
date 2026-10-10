@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { getCurrentUser } from "@/lib/session";
 import "@/styles/globals.css";
 
 const display = Libre_Caslon_Text({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-display", display: "swap" });
@@ -37,17 +38,18 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const member = await getCurrentUser();
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
-        <a className="skip" href="#ledger">Skip to your articles</a>
+        <a className="skip" href="#main">Skip to content</a>
         <ToastProvider>
           <div className="wrap">
-            <SiteHeader />
-            <main className="wrap page">{children}</main>
+            <SiteHeader member={member} />
+            <main className="wrap page" id="main">{children}</main>
             <SiteFooter />
           </div>
         </ToastProvider>

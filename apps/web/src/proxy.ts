@@ -1,7 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-/** A fresh CSP nonce per page view; Next.js applies it to its own scripts automatically. */
+// In production Caddy sends /api/* straight to Express and this never sees it. In dev and e2e runs,
+// forward it here: proxy.ts reads API_ORIGIN at request time, unlike next.config rewrites (fixed at build).
+const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:4000";
+
 export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  if (pathname.startsWith("/api/")) return NextResponse.rewrite(new URL(pathname + search, API_ORIGIN));
+  return withCsp(request);
+}
+
+/** A fresh CSP nonce per page view; Next.js applies it to its own scripts automatically. */
+function withCsp(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const dev = process.env.NODE_ENV === "development";
   const csp = [
@@ -31,10 +41,10 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [{
-    source: "/((?!api|_next/static|_next/image|favicon.ico|icon|og.png|robots.txt|manifest.webmanifest).*)",
+    source: "/((?!_next/static|_next/image|favicon.ico|icon|og.png|robots.txt|manifest.webmanifest).*)",
     missing: [
       { type: "header", key: "next-router-prefetch" },
       { type: "header", key: "purpose", value: "prefetch" },
     ],
-  }],
+  }, "/api/:path*"],
 };

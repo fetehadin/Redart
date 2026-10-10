@@ -73,6 +73,7 @@ Everything the current version does carries over. The behaviour is specified in 
 | Security headers | `helmet` on the API; CSP set in `next.config.ts` for the web |
 | Logging | `pino` + `pino-http` (redact cookies, passwords, notes) |
 | Tests | **Vitest** (unit, both apps), **Supertest** against a real Postgres test DB (API), **Playwright** for a few end-to-end flows |
+| Local Postgres | **embedded-postgres** (real PostgreSQL 17 binaries run as your own user; no Docker or sudo). `pnpm db:up` for dev; tests and e2e start a throwaway one. Set `TEST_DATABASE_URL` to use an external DB instead. |
 | Monorepo | **pnpm workspaces** |
 | Node | **24 LTS** |
 | Hosting | **Contabo VPS** with Docker Compose: `caddy`, `web`, `api`, `db`. See §8. |
@@ -129,7 +130,6 @@ packages/
     test/
 deploy/
   docker-compose.yml           production
-  docker-compose.dev.yml       local Postgres only
   Caddyfile
   web.Dockerfile  api.Dockerfile
   backup.sh  deploy.sh
@@ -225,9 +225,7 @@ This is the authoritative shape. Write the real `schema.prisma` from it with pro
 |---|---|
 | auth | `POST /auth/signup`, `POST /auth/signin`, `POST /auth/signout`, `POST /auth/signout-all`, `POST /auth/reset/request`, `POST /auth/reset/confirm` |
 | me | `GET /me`, `PATCH /me`, `PATCH /me/password`, `DELETE /me`, `POST /me/import` (guest ledger → account, idempotent merge) |
-| plans | `GET /plans`, `POST /plans`, `PATCH /plans/:id`, `DELETE /plans/:id`, `POST /plans/:id/spread` |
-| articles | `POST /plans/:id/articles`, `PATCH /articles/:id`, `DELETE /articles/:id`, `POST /plans/:id/reorder` |
-| favorites | `GET /favorites`, `POST /favorites`, `DELETE /favorites/:id` |
+| ledger | `GET /ledger?today=` (the member's whole LedgerState; creates the starter plan on first load), `POST /ledger/ops?today=` `{ ops: LedgerOp[] }` (1–200 ops, applied in order in one transaction; replaying an op is harmless). Plans, articles and favourites are only changed through ops. |
 | users | `GET /users/:handle`, `GET /users/:handle/plans`, `GET /users/:handle/favorites`, `GET /users/:handle/activity`, `GET /users/:handle/followers`, `GET /users/:handle/following`, `GET /users/search?q=` |
 | follows | `POST /users/:handle/follow`, `DELETE /users/:handle/follow`, `GET /follow-requests`, `POST /follow-requests/:followerId/accept`, `POST /follow-requests/:followerId/decline`, `DELETE /followers/:handle` |
 | blocks | `POST /users/:handle/block`, `DELETE /users/:handle/block` |
@@ -242,7 +240,7 @@ This is the authoritative shape. Write the real `schema.prisma` from it with pro
 - In production, Caddy serves both on **one domain**: `/api/*` goes to `api:4000` and everything else to `web:3000`. Same origin, so there's no CORS, and cookies just work.
 - Browser components call `fetch("/api/...", { credentials: "include" })` through `lib/api.ts`.
 - Server components (profiles, challenge pages) call `INTERNAL_API_URL` (`http://api:4000`) and forward the incoming `cookie` header. Use `cache: "no-store"` for anything user-specific.
-- In dev, `next.config.ts` rewrites `/api/:path*` to `http://localhost:4000/api/:path*`.
+- In dev and e2e runs, `src/proxy.ts` forwards `/api/*` to `API_ORIGIN` (read at request time; `next.config` rewrites are fixed at build time, so don't use them for this).
 
 ### 6.4 Ledger store
 `LedgerStore` is one interface with two implementations:
@@ -258,7 +256,7 @@ Every ledger change is a typed `LedgerOp` (`packages/shared/src/ledger.ts`) appl
 - **CSRF:** mutating requests must have an `Origin` that matches `APP_ORIGIN`, otherwise 403, on top of `SameSite=Lax` cookies.
 - **Authorisation:** every query for another user's data goes through `services/visibility.ts` (`canSee(viewerId, ownerId)`, which handles blocks, private accounts and hidden plans). Every route has a test proving another user gets 403/404.
 - **Validation:** every input is validated with Zod; limits come from `LIMITS` (`title 200`, `topic 40`, `notes 5000`, `planName 60`, minutes 1–600, days 1–365).
-- **Rate limits:** signin 10/min/IP, signup 5/h/IP, reset 5/h/IP, inspect 40/min/IP, recommendations 30/h/user, follows 60/h/user.
+- **Rate limits:** signin 10/min/IP, signup 5/h/IP, reset 5/h/IP, inspect 40/min/IP, recommendations 30/h/user, follows 60/h/user. `RATE_LIMIT_SCALE` multiplies all of them; only the e2e run sets it.
 - **Inspect SSRF rules stay exactly as strict:** http/https on ports 80/443 only, no credentials in URLs, resolve DNS and refuse private/loopback/link-local/CGNAT/metadata addresses, revalidate each redirect (max 5), 9 s timeout, 3 MB cap. Port the existing tests.
 - Use the same email-enumeration-safe response for "user not found" and "wrong password", and for reset requests.
 - Keep the strict CSP: no inline scripts except Next's nonce, `frame-ancestors 'none'`, `nosniff`, a strict referrer policy and a locked-down permissions policy.
@@ -340,7 +338,7 @@ POSTGRES_USER=redart POSTGRES_PASSWORD=*** POSTGRES_DB=redart
 
 ```bash
 pnpm install
-pnpm db:up            # local Postgres via deploy/docker-compose.dev.yml
+pnpm db:up            # local Postgres 17 on :5544 (embedded-postgres, data in apps/api/.data)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed
 pnpm dev              # web :3000 + api :4000
@@ -348,5 +346,5 @@ pnpm test             # all workspaces
 pnpm typecheck
 pnpm lint
 pnpm build
-pnpm e2e              # Playwright on prod builds; CHROMIUM_PATH=/usr/bin/chromium uses the system browser
+pnpm e2e              # Playwright on prod builds with a throwaway DB; CHROMIUM_PATH=/usr/bin/chromium uses the system browser
 ```

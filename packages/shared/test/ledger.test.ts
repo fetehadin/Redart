@@ -16,7 +16,7 @@ test("ops never mutate the input state", () => {
   const before = JSON.stringify(s);
   const a = s.plans[0]!.articles[0]!;
   applyOp(s, { type: "article.update", planId: "p1", articleId: a.id, patch: { done: true, doneAt: "2026-10-02" } });
-  applyOp(s, { type: "article.swap", planId: "p1", from: 0, to: 1 });
+  applyOp(s, { type: "article.move", planId: "p1", articleId: s.plans[0]!.articles[0]!.id, to: 1 });
   applyOp(s, { type: "plan.update", planId: "p1", name: "X", start: "2026-10-03", days: 10 });
   applyOp(s, { type: "plan.delete", planId: "p1" });
   assert.equal(JSON.stringify(s), before);
@@ -36,12 +36,19 @@ test("moving the plan start moves the due dates with it", () => {
   assert.equal(activePlan(s).name, "Oct");
 });
 
-test("swap keeps the date slots and swaps the articles", () => {
-  const s = applyOp(fixture(), { type: "article.swap", planId: "p1", from: 0, to: 1 });
+test("move keeps the date slots, and replaying it changes nothing", () => {
+  const s0 = fixture();
+  const a = s0.plans[0]!.articles[0]!;
+  const s = applyOp(s0, { type: "article.move", planId: "p1", articleId: a.id, to: 1 });
   const A = activePlan(s).articles;
-  assert.deepEqual(A.map((a) => a.title), ["b", "a", "c"]);
-  assert.deepEqual(A.map((a) => a.due), ["2026-10-01", "2026-10-05", "2026-10-09"]);
-  assert.equal(applyOp(s, { type: "article.swap", planId: "p1", from: 2, to: 3 }), s);
+  assert.deepEqual(A.map((x) => x.title), ["b", "a", "c"]);
+  assert.deepEqual(A.map((x) => x.due), ["2026-10-01", "2026-10-05", "2026-10-09"]);
+  assert.equal(applyOp(s, { type: "article.move", planId: "p1", articleId: a.id, to: 1 }), s);
+  // a longer move shifts everything in between through the slots
+  const far = applyOp(s0, { type: "article.move", planId: "p1", articleId: s0.plans[0]!.articles[2]!.id, to: 0 });
+  assert.deepEqual(activePlan(far).articles.map((x) => x.title), ["c", "a", "b"]);
+  assert.deepEqual(activePlan(far).articles.map((x) => x.due), ["2026-10-01", "2026-10-05", "2026-10-09"]);
+  assert.equal(applyOp(s0, { type: "article.move", planId: "p1", articleId: "nope", to: 0 }), s0);
 });
 
 test("deleting the active plan selects the latest one; the last plan can't be deleted", () => {

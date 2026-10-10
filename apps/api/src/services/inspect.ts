@@ -166,33 +166,40 @@ function titleFromPath(u: URL): string {
 }
 function decodeURIComponentSafe(s: string): string { try { return decodeURIComponent(s); } catch { return s; } }
 
-/* ---------- small in-process cache so popular articles are fetched once, not per visitor ---------- */
-// Phase 2 replaces this with the shared `Link` table.
+/* ---------- cache, so popular articles are fetched once, not once per reader ---------- */
+
 const OK_TTL_MS = 12 * 3600_000;
 const FINAL_TTL_MS = 24 * 3600_000; // invalid / blocked never change
 const SHORT_TTL_MS = 10 * 60_000;
-const MAX_ENTRIES = 5000;
 
-export class InspectCache {
-  private entries = new Map<string, { at: number; result: InspectResult }>();
-  constructor(private readonly clock: () => number = Date.now) {}
-
-  get(key: string): InspectResult | undefined {
-    const e = this.entries.get(key);
-    if (!e) return undefined;
-    if (this.clock() - e.at > ttl(e.result)) { this.entries.delete(key); return undefined; }
-    return e.result;
-  }
-
-  set(key: string, result: InspectResult): void {
-    if (result.status === "timeout") return; // likely transient; let the next reader retry
-    if (this.entries.size >= MAX_ENTRIES) this.entries.delete(this.entries.keys().next().value!);
-    this.entries.set(key, { at: this.clock(), result });
-  }
-}
-
-function ttl(r: InspectResult): number {
+export function cacheTtl(r: Pick<InspectResult, "status">): number {
   if (r.status === "ok") return OK_TTL_MS;
   if (r.status === "invalid" || r.status === "blocked") return FINAL_TTL_MS;
   return SHORT_TTL_MS;
+}
+/** Timeouts and rate limits are likely transient; let the next reader retry. */
+export const cacheable = (r: Pick<InspectResult, "status">) => r.status !== "timeout" && r.status !== "rate_limited";
+
+export interface LinkCache {
+  get(key: string): Promise<InspectResult | undefined>;
+  set(key: string, result: InspectResult): Promise<void>;
+}
+
+/** In-process cache, used by tests and as a fallback. */
+export class MemoryLinkCache implements LinkCache {
+  private entries = new Map<string, InspectResult>();
+  constructor(private readonly clock: () => number = Date.now, private readonly max = 5000) {}
+
+  async get(key: string) {
+    const r = this.entries.get(key);
+    if (!r) return undefined;
+    if (this.clock() - Date.parse(r.checkedAt) > cacheTtl(r)) { this.entries.delete(key); return undefined; }
+    return r;
+  }
+
+  async set(key: string, result: InspectResult) {
+    if (!cacheable(result)) return;
+    if (this.entries.size >= this.max) this.entries.delete(this.entries.keys().next().value!);
+    this.entries.set(key, result);
+  }
 }

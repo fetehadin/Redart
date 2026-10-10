@@ -15,7 +15,7 @@ export type LedgerOp =
   | { type: "article.add"; planId: string; article: Article; index?: number }
   | { type: "article.update"; planId: string; articleId: string; patch: ArticlePatch }
   | { type: "article.remove"; planId: string; articleId: string }
-  | { type: "article.swap"; planId: string; from: number; to: number }
+  | { type: "article.move"; planId: string; articleId: string; to: number }
   | { type: "favorite.add"; favorite: Favorite; index?: number }
   | { type: "favorite.update"; favoriteId: string; patch: FavoritePatch }
   | { type: "favorite.remove"; favoriteId: string }
@@ -41,6 +41,22 @@ function mapPlan(s: LedgerState, planId: string, fn: (p: Plan) => Plan): LedgerS
     return next;
   });
   return changed ? { ...s, plans } : s;
+}
+
+/**
+ * Move an article to index `to`. The due dates stay in their slots and the articles shift through them,
+ * so moving an article up also moves it earlier in the schedule. Moving to where it already is changes nothing,
+ * which makes the op safe to replay.
+ */
+export function moveKeepingDates<T extends { id: string; due: ISODate }>(list: T[], id: string, to: number): T[] {
+  const from = list.findIndex((a) => a.id === id);
+  const target = Math.max(0, Math.min(to, list.length - 1));
+  if (from < 0 || from === target) return list;
+  const moved = [...list];
+  const [item] = moved.splice(from, 1);
+  moved.splice(target, 0, item!);
+  const lo = Math.min(from, target), hi = Math.max(from, target);
+  return moved.map((a, i) => (i >= lo && i <= hi && a.due !== list[i]!.due ? { ...a, due: list[i]!.due } : a));
 }
 
 /** Apply one operation. Returns the same object when the op refers to something that no longer exists. */
@@ -87,16 +103,10 @@ export function applyOp(s: LedgerState, op: LedgerOp): LedgerState {
       return mapPlan(s, op.planId, (p) =>
         p.articles.some((a) => a.id === op.articleId) ? { ...p, articles: p.articles.filter((a) => a.id !== op.articleId) } : p);
 
-    case "article.swap":
+    case "article.move":
       return mapPlan(s, op.planId, (p) => {
-        const A = p.articles;
-        const { from: i, to: j } = op;
-        if (i === j || !A[i] || !A[j]) return p;
-        const articles = [...A];
-        // Keep the date slots; swap the articles in them.
-        articles[i] = { ...A[j]!, due: A[i]!.due };
-        articles[j] = { ...A[i]!, due: A[j]!.due };
-        return { ...p, articles };
+        const articles = moveKeepingDates(p.articles, op.articleId, op.to);
+        return articles === p.articles ? p : { ...p, articles };
       });
 
     case "favorite.add":

@@ -15,7 +15,10 @@
     "test": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint .",
-    "e2e": "pnpm --filter @redart/web run e2e"
+    "e2e": "pnpm --filter @redart/api run with-test-db --cwd ../web -- pnpm exec playwright test",
+    "db:up": "pnpm --filter @redart/api run db:up",
+    "db:migrate": "pnpm --filter @redart/api run db:migrate",
+    "db:seed": "pnpm --filter @redart/api run db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

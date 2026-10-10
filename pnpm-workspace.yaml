@@ -2,6 +2,11 @@ packages:
   - apps/*
   - packages/*
 onlyBuiltDependencies:
+  - "@prisma/engines"
+  - argon2
+  - "@embedded-postgres/linux-x64"
+  - embedded-postgres
   - esbuild
+  - prisma
   - sharp
   - unrs-resolver

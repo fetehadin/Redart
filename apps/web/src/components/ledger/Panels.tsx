@@ -250,7 +250,7 @@ export function PlanSettings({ onSaved }: { onSaved: () => void }) {
 /* ---------------- Backup ---------------- */
 
 export function Backup() {
-  const { state, today, restore } = useLedgerApi();
+  const { state, today, restore, member } = useLedgerApi();
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(false);
   const [msg, setMsg] = useState("");
@@ -276,7 +276,11 @@ export function Backup() {
   const articleCount = pending ? pending.plans.reduce((x, p) => x + p.articles.length, 0) : 0;
   return (
     <div className="form">
-      <p className="hint wide">Your ledger lives in this browser only. Copy this text and keep it somewhere safe (Telegram “Saved Messages” works well). To restore on any device, paste it in the box and press Restore. Restoring replaces everything here.</p>
+      <p className="hint wide">
+        {member
+          ? "Your ledger is saved to your account. You can still keep a copy: copy this text and store it somewhere safe. Restoring a backup replaces every plan and favourite in your account."
+          : "Your ledger lives in this browser only. Copy this text and keep it somewhere safe (Telegram “Saved Messages” works well). To restore on any device, paste it in the box and press Restore. Restoring replaces everything here."}
+      </p>
       <div className="field wide">
         <label className="visually-hidden" htmlFor="backupText">Backup text</label>
         <textarea ref={box} className="code" id="backupText" spellCheck={false} value={shown}
