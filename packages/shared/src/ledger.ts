@@ -11,6 +11,7 @@ export type LedgerOp =
   | { type: "plan.update"; planId: string; name: string; start: ISODate; days: number }
   | { type: "plan.delete"; planId: string }
   | { type: "plan.select"; planId: string }
+  | { type: "plan.setShared"; planId: string; shared: boolean }
   | { type: "plan.setDues"; planId: string; dues: Record<string, ISODate> }
   | { type: "article.add"; planId: string; article: Article; index?: number }
   | { type: "article.update"; planId: string; articleId: string; patch: ArticlePatch }
@@ -82,6 +83,9 @@ export function applyOp(s: LedgerState, op: LedgerOp): LedgerState {
 
     case "plan.select":
       return s.plans.some((p) => p.id === op.planId) && s.active !== op.planId ? { ...s, active: op.planId } : s;
+
+    case "plan.setShared":
+      return mapPlan(s, op.planId, (p) => ((p.shared ?? true) === op.shared ? p : { ...p, shared: op.shared }));
 
     case "plan.setDues":
       return mapPlan(s, op.planId, (p) => ({

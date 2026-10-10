@@ -39,7 +39,8 @@ Everything the current version does carries over. The behaviour is specified in 
 
 ### 2.3 Social
 - **Follow:** an asymmetric follow, like Twitter. Following a `PRIVATE` account creates a `PENDING` request that the owner accepts or declines. You can remove a follower.
-- **Profile `/u/[handle]`:** display name, bio, follower and following counts, articles read and minutes read (all time and this month), current visible plans with progress bars, favourites, challenges joined, and recent finished articles. A private account shows only the header to non-followers.
+- **Profile `/u/[handle]`:** display name, bio, follower and following counts, articles read and minutes read (all time and this month), current visible plans with progress bars, favourites, challenges joined, and recent finished articles. A private account shows only the header to non-followers. Guests (not signed in) see only the header of any profile. Hidden plans (`plan.setShared`) and everything finished in them never count or show for others.
+- **People `/people`:** search by name or @handle, and pending follow requests to accept or decline.
 - **Feed `/feed`:** what the people you follow have finished, favourited, recommended, joined (challenges) and started (plans). Strictly newest first, cursor-paginated (20 per page). No ranking algorithm.
 - **Recommend:** share an article (link + an optional message ≤280) either to all followers (it shows in the feed) or directly to one user who follows you (it shows in `/inbox`). One click adds a recommendation to any of your plans.
 - **Notifications** (`/inbox`, unread count in the nav): new follower, follow request, follow accepted, direct recommendation. Shown in-app only; no email in v1.
@@ -226,9 +227,9 @@ This is the authoritative shape. Write the real `schema.prisma` from it with pro
 | auth | `POST /auth/signup`, `POST /auth/signin`, `POST /auth/signout`, `POST /auth/signout-all`, `POST /auth/reset/request`, `POST /auth/reset/confirm` |
 | me | `GET /me`, `PATCH /me`, `PATCH /me/password`, `DELETE /me`, `POST /me/import` (guest ledger → account, idempotent merge) |
 | ledger | `GET /ledger?today=` (the member's whole LedgerState; creates the starter plan on first load), `POST /ledger/ops?today=` `{ ops: LedgerOp[] }` (1–200 ops, applied in order in one transaction; replaying an op is harmless). Plans, articles and favourites are only changed through ops. |
-| users | `GET /users/:handle`, `GET /users/:handle/plans`, `GET /users/:handle/favorites`, `GET /users/:handle/activity`, `GET /users/:handle/followers`, `GET /users/:handle/following`, `GET /users/search?q=` |
-| follows | `POST /users/:handle/follow`, `DELETE /users/:handle/follow`, `GET /follow-requests`, `POST /follow-requests/:followerId/accept`, `POST /follow-requests/:followerId/decline`, `DELETE /followers/:handle` |
-| blocks | `POST /users/:handle/block`, `DELETE /users/:handle/block` |
+| users | `GET /users/:handle` (header for everyone; stats only when `canSeeReading`), `GET /users/:handle/plans`, `GET /users/:handle/finished`, `GET /users/:handle/favorites`, `GET /users/:handle/followers`, `GET /users/:handle/following`, `GET /users/search?q=` (members) |
+| follows | `POST /users/:handle/follow`, `DELETE /users/:handle/follow`, `GET /follow-requests`, `POST /follow-requests/:handle/accept`, `POST /follow-requests/:handle/decline`, `DELETE /followers/:handle` |
+| blocks | `POST /users/:handle/block`, `DELETE /users/:handle/block`, `GET /blocks` |
 | feed | `GET /feed` |
 | recommendations | `POST /recommendations`, `GET /inbox/recommendations` |
 | notifications | `GET /notifications`, `POST /notifications/read` |

@@ -1,28 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-const PASSWORD = "a long enough passphrase";
-const unique = () => Math.random().toString(36).slice(2, 8);
-
-async function fakeInspect(page: Page) {
-  await page.route("**/api/inspect?*", (route) => route.fulfill({
-    json: { url: "", checkedAt: new Date().toISOString(), status: "ok", message: "Link works.", title: "Fetched title", words: 1190, minutes: 5, confidence: "high" },
-  }));
-}
-
-async function signUp(page: Page, name: string, opts: { bringGuest?: boolean } = {}) {
-  const handle = `${name.toLowerCase()}_${unique()}`;
-  const email = `${handle}@example.com`;
-  await page.goto("/signup");
-  await page.getByLabel("Your name").fill(name);
-  await page.getByLabel("Handle").fill(handle);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  const bring = page.getByLabel(/Bring the .* into my account/);
-  if (opts.bringGuest === false && await bring.isVisible()) await bring.uncheck();
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("button", { name: `@${handle}` })).toBeVisible();
-  return { handle, email };
-}
+import { expect, test } from "@playwright/test";
+import { fakeInspect, PASSWORD, signUp } from "./helpers";
 
 test.beforeEach(async ({ page }) => { await fakeInspect(page); });
 

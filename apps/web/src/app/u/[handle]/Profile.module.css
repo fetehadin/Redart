@@ -1,0 +1,30 @@
+.page { display: flex; flex-direction: column; gap: 18px; }
+.head { display: grid; grid-template-columns: auto 1fr auto; gap: 16px 20px; align-items: start; background: var(--card); border: 1px solid var(--rule); border-left: 4px double var(--margin); padding: 20px; }
+.id { min-width: 0; }
+.id h1 { font-family: var(--f-display); font-weight: 400; font-size: 1.8rem; margin: 0; line-height: 1.2; }
+.handle { margin: 2px 0 0; color: var(--ink-soft); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.badge { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border: 1px solid currentColor; padding: 0 6px; border-radius: 2px; }
+.bio { margin: 10px 0 0; max-width: 60ch; }
+.counts { margin: 10px 0 0; color: var(--ink-soft); font-size: .92rem; }
+.counts a { text-decoration: none; }
+.counts a:hover { text-decoration: underline; }
+.counts b { color: var(--ink); }
+.actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.locked { background: var(--card); border: 1px dashed var(--rule); padding: 24px; text-align: center; color: var(--ink-soft); margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.stats > div { background: var(--card); border: 1px solid var(--rule); padding: 14px 16px; display: flex; flex-direction: column; }
+.stats b { font-family: var(--f-display); font-weight: 400; font-size: 1.5rem; }
+.stats span:last-child { color: var(--ink-soft); font-size: .88rem; }
+.section h2 { font-family: var(--f-display); font-size: 1.2rem; margin: 0 0 8px; }
+.plans, .items { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--rule); }
+.plans li, .items li { padding: 12px 14px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
+.plans li:last-child, .items li:last-child { border-bottom: none; }
+.planTop { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.planTop span, .sub { color: var(--ink-soft); font-size: .86rem; }
+.items a, .items span:first-child { font-family: var(--f-display); font-size: 1.02rem; overflow-wrap: anywhere; }
+.bar { height: 6px; background: var(--chip); border-radius: 3px; }
+.bar i { display: block; height: 100%; background: var(--done); border-radius: 3px; }
+@media (max-width: 640px) {
+  .head { grid-template-columns: auto 1fr; }
+  .actions { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; }
+}

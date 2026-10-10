@@ -79,7 +79,10 @@ export async function loadLedger(db: Db, userId: string, today: ISODate): Promis
     db.user.findUniqueOrThrow({ where: { id: userId }, select: { activePlanId: true } }),
     db.favorite.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
   ]);
-  const shaped: Plan[] = plans.map((p) => ({ id: p.id, name: p.name, start: fromDbDate(p.start), days: p.days, articles: p.articles.map(articleFromRow) }));
+  const shaped: Plan[] = plans.map((p) => ({
+    id: p.id, name: p.name, start: fromDbDate(p.start), days: p.days, articles: p.articles.map(articleFromRow),
+    ...(p.visibleToFollowers ? {} : { shared: false }),
+  }));
   const active = shaped.some((p) => p.id === user.activePlanId) ? user.activePlanId! : shaped[0]!.id;
   return { version: 2, active, plans: shaped, favorites: favorites.map(favoriteFromRow), prefs: { theme: "system" } };
 }
@@ -87,7 +90,7 @@ export async function loadLedger(db: Db, userId: string, today: ISODate): Promis
 /* ---------- writing ---------- */
 
 async function insertPlan(tx: Tx, userId: string, p: Plan, makeActive = true) {
-  await tx.plan.create({ data: { id: p.id, userId, name: p.name.trim(), start: toDbDate(p.start), days: p.days } });
+  await tx.plan.create({ data: { id: p.id, userId, name: p.name.trim(), start: toDbDate(p.start), days: p.days, visibleToFollowers: p.shared !== false } });
   if (p.articles.length) await tx.article.createMany({ data: p.articles.map((a, i) => newArticleRow(p.id, a, i)) });
   if (makeActive) await tx.user.update({ where: { id: userId }, data: { activePlanId: p.id } });
 }
@@ -148,6 +151,11 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
     case "plan.select": {
       await ownedPlan(tx, userId, op.planId);
       await tx.user.update({ where: { id: userId }, data: { activePlanId: op.planId } });
+      return;
+    }
+    case "plan.setShared": {
+      await ownedPlan(tx, userId, op.planId);
+      await tx.plan.update({ where: { id: op.planId }, data: { visibleToFollowers: op.shared } });
       return;
     }
     case "plan.setDues": {

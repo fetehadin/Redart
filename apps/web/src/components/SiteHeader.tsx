@@ -18,6 +18,7 @@ export function SiteHeader({ member }: { member: Me | null }) {
       </div>
       <nav className={styles.nav} aria-label="Site">
         <Link href="/" className={styles.link}>Ledger</Link>
+        {member ? <Link href="/people" className={styles.link}>People</Link> : null}
         {member ? <AccountMenu member={member} /> : <Link href="/signin" className="btn">Sign in</Link>}
         <ThemeToggle />
       </nav>

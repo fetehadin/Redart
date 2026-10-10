@@ -40,6 +40,7 @@ export function AccountMenu({ member }: { member: Me }) {
       {open && (
         <div className={styles.panel}>
           <p className={styles.who}><strong>{member.displayName}</strong><br /><span>{member.email}</span></p>
+          <Link href={`/u/${member.handle}`} onClick={() => setOpen(false)}>Your profile</Link>
           <Link href="/settings" onClick={() => setOpen(false)}>Settings</Link>
           <button type="button" onClick={signOut}>Sign out</button>
         </div>

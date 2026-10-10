@@ -9,6 +9,7 @@ import { healthRouter } from "./routes/health";
 import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
 import { ledgerRouter } from "./routes/ledger";
+import { peopleRouter } from "./routes/people";
 import { errorHandler, notFound } from "./middleware/errors";
 import { loadSession } from "./middleware/auth";
 import { requireSameOrigin } from "./middleware/csrf";
@@ -44,6 +45,7 @@ export function createApp(opts: AppOptions): Express {
   api.use(authRouter(db, config));
   api.use(meRouter(db, config));
   api.use(ledgerRouter(db));
+  api.use(peopleRouter(db));
   app.use("/api", api);
 
   app.use(notFound);

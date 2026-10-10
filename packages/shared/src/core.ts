@@ -38,6 +38,8 @@ export interface Plan {
   start: ISODate;
   days: number;
   articles: Article[];
+  /** Members only: whether followers can see this plan. Missing means shared. */
+  shared?: boolean;
 }
 
 export interface Favorite {
@@ -281,7 +283,7 @@ export function sanitizeState(o: unknown, today: ISODate): LedgerState | null {
     if (seenPlanIds.has(id)) id = uid();
     seenPlanIds.add(id);
     const name = str(p.name, LIMITS.planName) || "Untitled plan";
-    plans.push({ id, name, start, days, articles });
+    plans.push({ id, name, start, days, articles, ...(p.shared === false ? { shared: false } : {}) });
   }
   if (!plans.length) return null;
   const favorites: Favorite[] = [];

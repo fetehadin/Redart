@@ -36,6 +36,7 @@ export const planSchema = z.object({
   start: isoDate,
   days: z.number().int().min(LIMITS.minDays).max(LIMITS.maxDays),
   articles: z.array(articleSchema).max(1000),
+  shared: z.boolean().optional(),
 });
 
 export const favoriteSchema = z.object({
@@ -56,6 +57,7 @@ export const ledgerOpSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("plan.update"), planId: z.uuid(), name: planSchema.shape.name, start: isoDate, days: planSchema.shape.days }),
   z.object({ type: z.literal("plan.delete"), planId: z.uuid() }),
   z.object({ type: z.literal("plan.select"), planId: z.uuid() }),
+  z.object({ type: z.literal("plan.setShared"), planId: z.uuid(), shared: z.boolean() }),
   z.object({ type: z.literal("plan.setDues"), planId: z.uuid(), dues: z.record(z.uuid(), isoDate) }),
   z.object({ type: z.literal("article.add"), planId: z.uuid(), article: articleSchema, index }),
   z.object({ type: z.literal("article.update"), planId: z.uuid(), articleId: z.uuid(), patch: articlePatchSchema }),
@@ -103,3 +105,5 @@ export const deleteMeBody = z.object({ password: z.string().min(1).max(ACCOUNT_L
 export const importBody = z.object({ state: z.unknown() });
 
 export type LedgerOpInput = z.infer<typeof ledgerOpSchema>;
+
+export const searchQuery = z.object({ q: z.string().trim().min(1).max(50) });

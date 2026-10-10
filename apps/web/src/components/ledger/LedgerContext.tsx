@@ -37,6 +37,7 @@ export interface LedgerApi {
   createPlan(input: { name: string; start: ISODate; days: number; seed: PlanSeed }): void;
   updatePlan(input: { name: string; start: ISODate; days: number }): void;
   deletePlan(): void;
+  setPlanShared(shared: boolean): void;
   addArticle(input: { title: string; url: string; topic: string; minutes: number; minutesAuto: boolean; due: ISODate }): void;
   saveArticle(a: Article, fields: { title: string; url: string; topic: string; minutes: number }): void;
   setNotes(id: string, notes: string): void;
@@ -180,6 +181,11 @@ export function LedgerProvider({ member, children, fallback }: ProviderProps) {
         const outside = after.articles.filter((a) => a.due > planEnd(after)).length;
         toast((shift ? `Saved. Due dates moved ${plural(Math.abs(shift), "day")} ${shift > 0 ? "later" : "earlier"}.` : "Settings saved.") +
           (outside ? ` ${plural(outside, "article")} now fall after the plan ends; use “Spread dates” to fit them in.` : ""));
+      }),
+
+      setPlanShared: (shared) => withState((_s, p) => {
+        dispatch({ type: "plan.setShared", planId: p.id, shared });
+        toast(shared ? "Followers can see this plan." : "This plan is hidden from followers.");
       }),
 
       deletePlan: () => withState((s, p) => {

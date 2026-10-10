@@ -205,7 +205,7 @@ export function NewPlan({ onCreated }: { onCreated: () => void }) {
 /* ---------------- Plan settings ---------------- */
 
 export function PlanSettings({ onSaved }: { onSaved: () => void }) {
-  const { state, plan, updatePlan, deletePlan } = useLedgerApi();
+  const { state, plan, member, updatePlan, deletePlan, setPlanShared } = useLedgerApi();
   const [name, setName] = useState(plan.name);
   const [start, setStart] = useState(plan.start);
   const [days, setDays] = useState(String(plan.days));
@@ -229,6 +229,12 @@ export function PlanSettings({ onSaved }: { onSaved: () => void }) {
       <Field id="pName" label="Plan name"><input type="text" id="pName" maxLength={LIMITS.planName} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} /></Field>
       <Field id="pStart" label="Start date"><input type="date" id="pStart" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
       <Field id="pDays" label="Length in days"><input type="number" id="pDays" min={1} max={365} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} /></Field>
+      {member ? (
+        <label className="wide confirm">
+          <input type="checkbox" checked={plan.shared !== false} onChange={(e) => setPlanShared(e.target.checked)} />
+          Show this plan and what I finish in it to people who follow me (notes always stay private)
+        </label>
+      ) : null}
       <div className="row-actions">
         <button className="btn solid" type="submit">Save settings</button>
         {!confirming ? (

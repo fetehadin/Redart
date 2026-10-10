@@ -87,3 +87,12 @@ test("favourites: add to the front, update, remove", () => {
   s = applyOp(s, { type: "favorite.remove", favoriteId: f.id });
   assert.equal(s.favorites.length, 0);
 });
+
+test("plans can be hidden from followers and shown again", () => {
+  const s = applyOp(fixture(), { type: "plan.setShared", planId: "p1", shared: false });
+  assert.equal(activePlan(s).shared, false);
+  const back = applyOp(s, { type: "plan.setShared", planId: "p1", shared: true });
+  assert.equal(activePlan(back).shared, true);
+  const f = fixture();
+  assert.equal(applyOp(f, { type: "plan.setShared", planId: "p1", shared: true }), f); // shared is the default: no change
+});
