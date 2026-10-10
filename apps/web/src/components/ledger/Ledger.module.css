@@ -87,6 +87,6 @@
   .empty { padding-left: 44px; }
   .tools { width: 100%; }
   .tools input[type=search] { flex: 1 1 100%; width: auto; }
-  .planbar { width: 100%; flex-wrap: nowrap; }
+  .planbar { width: 100%; flex-wrap: wrap; }
   .planbar select { flex: 1 1 0; min-width: 0; max-width: none; }
 }

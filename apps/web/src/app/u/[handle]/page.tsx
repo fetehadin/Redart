@@ -24,13 +24,14 @@ export default async function ProfilePage({ params }: Params) {
   const [{ data: profile }, me] = await Promise.all([serverApi<Profile>(`/api/users/${h}`), getCurrentUser()]);
   if (!profile) notFound();
 
-  const [plans, finished, favorites] = profile.canSeeReading
+  const [plans, finished, favorites, challenges] = profile.canSeeReading
     ? await Promise.all([
         serverApi<{ items: PlanSummary[] }>(`/api/users/${h}/plans`),
         serverApi<Page<FinishedItem>>(`/api/users/${h}/finished?limit=10`),
         serverApi<Page<PublicFavorite>>(`/api/users/${h}/favorites?limit=10`),
+        serverApi<{ items: { slug: string; title: string; start: string; days: number; track: string }[] }>(`/api/users/${h}/challenges`),
       ])
-    : [null, null, null];
+    : [null, null, null, null];
 
   const rel = profile.relationship;
   const year = new Date().getUTCFullYear();
@@ -94,6 +95,20 @@ export default async function ProfilePage({ params }: Params) {
               </ul>
             ) : <p className="hint">No plans to show yet.</p>}
           </section>
+
+          {challenges?.data?.items.length ? (
+            <section className={styles.section}>
+              <h2>Challenges</h2>
+              <ul className={styles.items}>
+                {challenges.data.items.map((c) => (
+                  <li key={c.slug}>
+                    <Link href={`/challenges/${c.slug}`}>{c.title}</Link>
+                    <span className={styles.sub}>{c.track} pace · {shortDate(c.start, year)} · {plural(c.days, "day")}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className={styles.section}>
             <h2>Recently finished</h2>

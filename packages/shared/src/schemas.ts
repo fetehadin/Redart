@@ -125,3 +125,40 @@ export const quickAddBody = z.object({
   minutes: z.number().int().min(LIMITS.minMinutes).max(LIMITS.maxMinutes).nullable().optional(),
   topic: z.string().trim().max(LIMITS.topic).optional(),
 });
+
+/* ---------- challenges ---------- */
+
+export const CHALLENGE_LIMITS = { title: 80, description: 1000, articles: 100, minDays: 7, maxDays: 92, topics: 6 } as const;
+
+export const curatedArticleSchema = z.object({
+  url: z.string().trim().max(2048).refine((s) => safeUrl(s) !== null, "Use a full http(s) link.").transform((s) => safeUrl(s)!),
+  title: z.string().trim().min(1).max(LIMITS.title),
+  minutes: z.number().int().min(LIMITS.minMinutes).max(LIMITS.maxMinutes).nullable(),
+  topic: z.string().trim().max(LIMITS.topic).default(""),
+});
+
+export const createChallengeBody = z.object({
+  title: z.string().trim().min(3, "Give the challenge a title.").max(CHALLENGE_LIMITS.title),
+  description: z.string().trim().max(CHALLENGE_LIMITS.description).default(""),
+  start: isoDate,
+  days: z.number().int().min(CHALLENGE_LIMITS.minDays, `Challenges last at least ${CHALLENGE_LIMITS.minDays} days.`).max(CHALLENGE_LIMITS.maxDays, `Challenges last at most ${CHALLENGE_LIMITS.maxDays} days.`),
+  topics: z.array(z.string().trim().min(1).max(LIMITS.topic)).max(CHALLENGE_LIMITS.topics).default([]),
+  access: z.enum(["PUBLIC", "INVITE"]).default("PUBLIC"),
+  featured: z.boolean().optional(),
+  articles: z.array(curatedArticleSchema).min(1, "Add at least one article.").max(CHALLENGE_LIMITS.articles),
+});
+
+export const updateChallengeBody = z.object({
+  title: createChallengeBody.shape.title.optional(),
+  description: z.string().trim().max(CHALLENGE_LIMITS.description).optional(),
+  topics: createChallengeBody.shape.topics.optional(),
+  featured: z.boolean().optional(),
+});
+
+export const joinChallengeBody = z.object({
+  track: z.enum(["light", "steady", "deep"]),
+  inviteCode: z.string().trim().max(64).optional(),
+  showOnLeaderboard: z.boolean().default(false),
+});
+export const switchTrackBody = z.object({ track: z.enum(["light", "steady", "deep"]) });
+export const leaderboardOptBody = z.object({ showOnLeaderboard: z.boolean() });

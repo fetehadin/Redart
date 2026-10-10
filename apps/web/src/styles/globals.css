@@ -53,6 +53,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.ghost { border-color: transparent; text-decoration: underline; text-underline-offset: 3px; padding-inline: 4px; min-height: 0; }
 .btn.danger { border-color: var(--late); color: var(--late); }
 .icon-btn { min-width: 36px; padding-inline: 8px; }
+a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+a.btn.solid { color: var(--card); }
+input[type=radio], input[type=checkbox] { accent-color: var(--ink); }
 
 /* Inputs */
 select, input[type=text], input[type=url], input[type=number], input[type=date], input[type=search], input[type=email], input[type=password], textarea {

@@ -40,6 +40,8 @@ export interface Plan {
   articles: Article[];
   /** Members only: whether followers can see this plan. Missing means shared. */
   shared?: boolean;
+  /** Members only, read-only: the challenge this plan belongs to. */
+  challenge?: { slug: string; title: string; track: string };
 }
 
 export interface Favorite {

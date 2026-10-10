@@ -52,8 +52,9 @@ Everything the current version does carries over. The behaviour is specified in 
   - `DEEP`: 1 or more articles/day
 
   Each track stores `targetArticles` and/or `targetMinutes`.
-- **Joining** creates a normal plan in the user's ledger, linked to the challenge and track and seeded from the curated list. Due dates are spread to match the track's pace with `spread()` / `nextDueDate()` from `@redart/shared`. Users can add their own articles too.
-- **Switching tracks** mid-challenge re-spreads the unread articles from today. **Leaving** keeps the plan but unlinks it.
+- **Joining** creates a normal plan in the user's ledger, linked to the challenge and track and seeded with the first `targetArticles` of the curated list (`articlesForTrack` in `packages/shared/src/challenges.ts`). Due dates are spread from today (or the start, if it hasn't begun) to the end. Users can add their own articles too. Targets are `round(rate × days)`, capped at the list length.
+- **Switching tracks** mid-challenge (`retrack`) adds curated articles up to the new target and re-spreads the unread articles from today; finished articles keep their dates and nothing the reader added is removed. **Leaving** keeps the plan but unlinks it.
+- **Seed:** `pnpm db:seed` creates the `@redart` house account and featured challenges for this month and next (idempotent).
 - **Preferences:** the topics a user picks in settings put matching challenges first on `/challenges` (a simple tag match, not ML). Each listing shows "This month", "Upcoming" and "Past".
 - **Who creates challenges:** admins (`isAdmin`) create `featured` official monthly challenges. Any member can create a challenge, either `PUBLIC` or `INVITE` (joined via a secret invite link).
 - **Challenge page `/challenges/[slug]`:** description, tracks, curated list, participant count, and an **opt-in** leaderboard ranked by articles finished, then minutes.
@@ -234,7 +235,7 @@ This is the authoritative shape. Write the real `schema.prisma` from it with pro
 | recommendations | `POST /recommendations` (`toHandle` only for someone who follows you; omitted = all followers' feeds), `GET /inbox/recommendations` |
 | notifications | `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/read` |
 | quick add | `POST /ledger/quick-add` (feed/inbox "Add to my plan": appends to the active plan; same link twice is a no-op) |
-| challenges | `GET /challenges?when=current\|upcoming\|past`, `POST /challenges`, `GET /challenges/:slug`, `PATCH /challenges/:slug`, `POST /challenges/:slug/join` `{ trackId, inviteCode? }`, `POST /challenges/:slug/track`, `DELETE /challenges/:slug/join`, `GET /challenges/:slug/leaderboard`, `PATCH /challenges/:slug/me` `{ showOnLeaderboard }` |
+| challenges | `GET /challenges?when=current\|upcoming\|past` (guests too), `POST /challenges`, `GET /challenges/:slug[?invite=]`, `PATCH /challenges/:slug`, `POST /challenges/:slug/join` `{ track: light\|steady\|deep, inviteCode?, showOnLeaderboard? }`, `POST /challenges/:slug/track` `{ track }`, `DELETE /challenges/:slug/join`, `GET /challenges/:slug/leaderboard`, `PATCH /challenges/:slug/me` `{ showOnLeaderboard }`, `GET /users/:handle/challenges` |
 | inspect | `GET /inspect?url=` (open to guests; reads and writes the `Link` cache, 12 h for OK results) |
 | health | `GET /health` (DB ping, used by Docker healthcheck) |
 

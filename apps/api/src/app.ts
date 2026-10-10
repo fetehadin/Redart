@@ -11,6 +11,7 @@ import { meRouter } from "./routes/me";
 import { ledgerRouter } from "./routes/ledger";
 import { peopleRouter } from "./routes/people";
 import { socialRouter } from "./routes/social";
+import { challengesRouter } from "./routes/challenges";
 import { errorHandler, notFound } from "./middleware/errors";
 import { loadSession } from "./middleware/auth";
 import { requireSameOrigin } from "./middleware/csrf";
@@ -48,6 +49,7 @@ export function createApp(opts: AppOptions): Express {
   api.use(ledgerRouter(db));
   api.use(peopleRouter(db));
   api.use(socialRouter(db));
+  api.use(challengesRouter(db));
   app.use("/api", api);
 
   app.use(notFound);

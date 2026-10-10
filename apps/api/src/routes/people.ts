@@ -165,6 +165,17 @@ export function peopleRouter(db: Db): Router {
     res.json(body);
   });
 
+  r.get("/users/:handle/challenges", async (req, res) => {
+    const { owner } = await readable(req);
+    const self = req.user?.id === owner.id;
+    const rows = await db.challengeParticipant.findMany({
+      // Invite-only challenges are listed only to the reader themselves; hidden plans hide their challenge too.
+      where: { userId: owner.id, ...(self ? {} : { challenge: { access: "PUBLIC" }, plan: { visibleToFollowers: true } }) },
+      include: { challenge: true, track: true }, orderBy: { joinedAt: "desc" }, take: 20,
+    });
+    res.json({ items: rows.map((p) => ({ slug: p.challenge.slug, title: p.challenge.title, start: fromDbDate(p.challenge.start), days: p.challenge.days, track: p.track.name })) });
+  });
+
   for (const dir of ["followers", "following"] as const) {
     r.get(`/users/:handle/${dir}`, async (req, res) => {
       const { owner } = await readable(req);

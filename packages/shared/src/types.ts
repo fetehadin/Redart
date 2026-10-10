@@ -118,3 +118,36 @@ export type NotificationItem =
   | { id: string; kind: "RECOMMENDATION"; actor: UserCard; createdAt: string; read: boolean; recommendation: InboxRecommendation };
 
 export interface QuickAddResult { planName: string; due: string; duplicate: boolean }
+
+/* ---------- challenges ---------- */
+
+export interface ChallengeTrackInfo { key: "light" | "steady" | "deep"; name: string; description: string; targetArticles: number }
+
+export interface ChallengeSummary {
+  slug: string;
+  title: string;
+  description: string;
+  start: string;
+  days: number;
+  topics: string[];
+  featured: boolean;
+  access: "PUBLIC" | "INVITE";
+  participants: number;
+  articleCount: number;
+  tracks: ChallengeTrackInfo[];
+  createdBy: UserCard;
+  /** The viewer's track key when they've joined. */
+  joined: string | null;
+  /** How many of the viewer's preferred topics this challenge covers. */
+  topicMatches: number;
+}
+
+export interface ChallengeDetail extends ChallengeSummary {
+  articles: { url: string; title: string; minutes: number | null; topic: string }[];
+  canEdit: boolean;
+  /** Only shown to the creator of an invite-only challenge. */
+  inviteCode: string | null;
+  me: { track: string; planId: string; showOnLeaderboard: boolean; done: number; total: number } | null;
+}
+
+export interface LeaderboardRow { rank: number; user: UserCard; done: number; minutes: number; track: string }

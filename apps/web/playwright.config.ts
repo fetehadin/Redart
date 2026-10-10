@@ -9,6 +9,9 @@ export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
   timeout: 60_000,
+  // Several browsers sign up at once (argon2 is deliberately slow), so allow for a busy machine.
+  expect: { timeout: 15_000 },
+  workers: process.env.CI ? 2 : 3,
   reporter: process.env.CI ? "github" : "list",
   use: { baseURL: WEB, trace: "retain-on-failure" },
   projects: [

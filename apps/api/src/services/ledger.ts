@@ -64,17 +64,16 @@ const STARTER_PLAN_NAME = "Backend & AI reading — 30 days";
 
 /** The member's whole ledger. A member with no plans gets the starter plan, like a new guest. */
 export async function loadLedger(db: Db, userId: string, today: ISODate): Promise<LedgerState> {
-  let plans = await db.plan.findMany({
-    where: { userId }, orderBy: [{ start: "desc" }, { createdAt: "desc" }],
-    include: { articles: { orderBy: { position: "asc" } } },
-  });
+  const include = { articles: { orderBy: { position: "asc" } }, challenge: { select: { slug: true, title: true } }, track: { select: { name: true } } } satisfies Prisma.PlanInclude;
+  let plans = await db.plan.findMany({ where: { userId }, orderBy: [{ start: "desc" }, { createdAt: "desc" }], include });
   if (!plans.length) {
     await db.$transaction(async (tx) => {
-      // Re-check inside the transaction so two first loads don't both create a plan.
+      // Lock the member's row so two first loads (two tabs) can't both create a plan, then re-check.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId}::uuid FOR UPDATE`;
       if (await tx.plan.count({ where: { userId } })) return;
       await insertPlan(tx, userId, { id: uid(), name: STARTER_PLAN_NAME, start: today, days: 30, articles: articlesFromRows(STARTER, today, 30).map((a) => ({ ...a, minutesAuto: true })) });
     });
-    plans = await db.plan.findMany({ where: { userId }, orderBy: { start: "desc" }, include: { articles: { orderBy: { position: "asc" } } } });
+    plans = await db.plan.findMany({ where: { userId }, orderBy: { start: "desc" }, include });
   }
   const [user, favorites] = await Promise.all([
     db.user.findUniqueOrThrow({ where: { id: userId }, select: { activePlanId: true } }),
@@ -83,6 +82,7 @@ export async function loadLedger(db: Db, userId: string, today: ISODate): Promis
   const shaped: Plan[] = plans.map((p) => ({
     id: p.id, name: p.name, start: fromDbDate(p.start), days: p.days, articles: p.articles.map(articleFromRow),
     ...(p.visibleToFollowers ? {} : { shared: false }),
+    ...(p.challenge ? { challenge: { slug: p.challenge.slug, title: p.challenge.title, track: p.track?.name ?? "" } } : {}),
   }));
   const active = shaped.some((p) => p.id === user.activePlanId) ? user.activePlanId! : shaped[0]!.id;
   return { version: 2, active, plans: shaped, favorites: favorites.map(favoriteFromRow), prefs: { theme: "system" } };
@@ -90,7 +90,25 @@ export async function loadLedger(db: Db, userId: string, today: ISODate): Promis
 
 /* ---------- writing ---------- */
 
-async function insertPlan(tx: Tx, userId: string, p: Plan, makeActive = true) {
+/** Add articles after the plan's last one. */
+export async function appendArticles(tx: Tx, planId: string, articles: Article[]) {
+  if (!articles.length) return;
+  const last = await tx.article.findFirst({ where: { planId }, orderBy: { position: "desc" }, select: { position: true } });
+  const base = (last?.position ?? -1) + 1;
+  await tx.article.createMany({ data: articles.map((a, i) => newArticleRow(planId, a, base + i)) });
+}
+
+/** Set due dates for the given articles of one plan, in one statement. */
+export async function setDues(tx: Tx, planId: string, dues: Record<string, ISODate>) {
+  const entries = Object.entries(dues);
+  if (!entries.length) return;
+  await tx.$executeRaw`
+    UPDATE "Article" AS a SET "due" = v.due
+    FROM unnest(${entries.map(([id]) => id)}::uuid[], ${entries.map(([, d]) => d)}::date[]) AS v(id, due)
+    WHERE a.id = v.id AND a."planId" = ${planId}::uuid`;
+}
+
+export async function insertPlan(tx: Tx, userId: string, p: Plan, makeActive = true) {
   await tx.plan.create({ data: { id: p.id, userId, name: p.name.trim(), start: toDbDate(p.start), days: p.days, visibleToFollowers: p.shared !== false } });
   if (p.articles.length) await tx.article.createMany({ data: p.articles.map((a, i) => newArticleRow(p.id, a, i)) });
   if (makeActive) await tx.user.update({ where: { id: userId }, data: { activePlanId: p.id } });
@@ -162,12 +180,7 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
     }
     case "plan.setDues": {
       await ownedPlan(tx, userId, op.planId);
-      const entries = Object.entries(op.dues);
-      if (!entries.length) return;
-      await tx.$executeRaw`
-        UPDATE "Article" AS a SET "due" = v.due
-        FROM unnest(${entries.map(([id]) => id)}::uuid[], ${entries.map(([, d]) => d)}::date[]) AS v(id, due)
-        WHERE a.id = v.id AND a."planId" = ${op.planId}::uuid`;
+      await setDues(tx, op.planId, op.dues);
       return;
     }
     case "article.add": {

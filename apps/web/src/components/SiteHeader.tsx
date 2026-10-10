@@ -19,6 +19,7 @@ export function SiteHeader({ member, unread = 0 }: { member: Me | null; unread?:
       <nav className={styles.nav} aria-label="Site">
         <Link href="/" className={styles.link}>Ledger</Link>
         {member ? <Link href="/feed" className={styles.link}>Feed</Link> : null}
+        <Link href="/challenges" className={styles.link}>Challenges</Link>
         {member ? <Link href="/people" className={styles.link}>People</Link> : null}
         {member ? (
           <Link href="/inbox" className={styles.link} aria-label={unread ? `Inbox, ${unread} new` : "Inbox"}>

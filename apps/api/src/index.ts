@@ -25,6 +25,10 @@ const app = createApp({
 });
 
 const server = app.listen(env.PORT, () => logger.info(`API listening on :${env.PORT}${mailer ? "" : " (no SMTP: password reset by email is off)"}`));
+// Proxies in front (Caddy, Next in dev) reuse idle connections. Node's default 5 s keep-alive lets the API close one
+// just as the proxy sends on it ("socket hang up"), so stay open longer than any proxy keeps connections idle.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);

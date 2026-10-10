@@ -1,0 +1,50 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.title { font-family: var(--f-display); font-weight: 400; font-size: 1.8rem; margin: 0; }
+.intro { color: var(--ink-soft); margin: 4px 0 0; max-width: 62ch; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs a { border: 1px solid var(--rule); background: var(--card); padding: 5px 12px; border-radius: 3px; text-decoration: none; font-size: .92rem; }
+.tabs a[aria-current=page] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--rule); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.card.featured { border-left: 4px double var(--margin); }
+.card h2 { font-family: var(--f-display); font-weight: 400; font-size: 1.2rem; margin: 0; line-height: 1.3; }
+.card h2 a { text-decoration: none; }
+.card h2 a:hover { text-decoration: underline; }
+.when { color: var(--ink-soft); font-size: .88rem; }
+.desc { margin: 0; font-size: .95rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.chips li { background: var(--chip); padding: 1px 8px; border-radius: 2px; font-size: .78rem; font-weight: 600; }
+.chips li.match { outline: 1px solid var(--done); }
+.foot { margin-top: auto; display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: .88rem; color: var(--ink-soft); flex-wrap: wrap; }
+.tag { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--margin); }
+.joinedTag { color: var(--done); font-weight: 700; }
+.empty { background: var(--card); border: 1px dashed var(--rule); padding: 28px 20px; text-align: center; color: var(--ink-soft); }
+
+/* detail */
+.hero { background: var(--card); border: 1px solid var(--rule); border-left: 4px double var(--margin); padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.hero h1 { font-family: var(--f-display); font-weight: 400; font-size: 1.9rem; margin: 0; line-height: 1.2; }
+.hero p { margin: 0; max-width: 70ch; }
+.section h2 { font-family: var(--f-display); font-size: 1.2rem; margin: 0 0 8px; }
+.tracks { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.track { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--rule); padding: 12px 14px; cursor: pointer; }
+.track:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.track input { margin-top: 5px; }
+.track b { display: block; }
+.track span { color: var(--ink-soft); font-size: .9rem; }
+.joinBox { display: flex; flex-direction: column; gap: 12px; }
+.status { background: var(--card); border: 1px solid var(--rule); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.bar { height: 8px; background: var(--chip); border-radius: 4px; }
+.bar i { display: block; height: 100%; background: var(--done); border-radius: 4px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.list { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--rule); counter-reset: n; }
+.list li { padding: 10px 14px 10px 48px; border-bottom: 1px solid var(--rule); position: relative; display: flex; flex-direction: column; }
+.list li::before { counter-increment: n; content: counter(n, decimal-leading-zero); position: absolute; left: 14px; top: 12px; font-family: var(--f-mono); color: var(--ink-soft); font-size: .85rem; }
+.list li:last-child { border-bottom: none; }
+.list a, .list .t { font-family: var(--f-display); font-size: 1.02rem; overflow-wrap: anywhere; }
+.sub { color: var(--ink-soft); font-size: .86rem; }
+.board { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--rule); }
+.board th, .board td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+.board th { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.board td.num { font-family: var(--f-mono); }
+.invite { font-family: var(--f-mono); font-size: .85rem; background: var(--paper); border: 1px dashed var(--rule); padding: 8px; overflow-wrap: anywhere; }
