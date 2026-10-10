@@ -92,3 +92,29 @@ export interface PublicFavorite {
 }
 
 export interface Page<T> { items: T[]; nextCursor: string | null }
+
+/* ---------- feed, recommendations, notifications ---------- */
+
+export interface ArticleRef { title: string; url: string; minutes: number | null; topic: string }
+
+export type FeedItem =
+  | { id: string; kind: "FINISHED"; createdAt: string; actor: UserCard; article: ArticleRef; planName: string }
+  | { id: string; kind: "FAVORITED"; createdAt: string; actor: UserCard; article: ArticleRef }
+  | { id: string; kind: "RECOMMENDED"; createdAt: string; actor: UserCard; article: ArticleRef; message: string }
+  | { id: string; kind: "STARTED_PLAN"; createdAt: string; actor: UserCard; planName: string; days: number; articles: number }
+  | { id: string; kind: "JOINED_CHALLENGE"; createdAt: string; actor: UserCard; challenge: { slug: string; title: string }; track: string };
+
+export interface InboxRecommendation {
+  id: string;
+  from: UserCard;
+  article: ArticleRef;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export type NotificationItem =
+  | { id: string; kind: "NEW_FOLLOWER" | "FOLLOW_REQUEST" | "FOLLOW_ACCEPTED"; actor: UserCard; createdAt: string; read: boolean }
+  | { id: string; kind: "RECOMMENDATION"; actor: UserCard; createdAt: string; read: boolean; recommendation: InboxRecommendation };
+
+export interface QuickAddResult { planName: string; due: string; duplicate: boolean }

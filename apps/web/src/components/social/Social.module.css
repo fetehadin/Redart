@@ -1,0 +1,22 @@
+.page { display: flex; flex-direction: column; gap: 14px; }
+.title { font-family: var(--f-display); font-weight: 400; font-size: 1.8rem; margin: 0; }
+.list { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--rule); }
+.entry { display: flex; gap: 12px; padding: 14px; border-bottom: 1px solid var(--rule); }
+.entry:last-child { border-bottom: none; }
+.entry.unread { background: color-mix(in srgb, var(--chip) 55%, var(--card)); }
+.body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.line { margin: 0; }
+.actor { font-weight: 700; text-decoration: none; }
+.actor:hover { text-decoration: underline; }
+.when { color: var(--ink-soft); font-size: .88rem; }
+.article { display: flex; flex-direction: column; border-left: 3px solid var(--rule); padding-left: 10px; }
+.article a, .article > span:first-child { font-family: var(--f-display); font-size: 1.05rem; overflow-wrap: anywhere; }
+.meta { color: var(--ink-soft); font-size: .86rem; }
+.message { margin: 0; font-style: italic; color: var(--ink); }
+.message::before { content: "“"; }
+.message::after { content: "”"; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.more { text-align: center; margin: 0; }
+.empty { background: var(--card); border: 1px dashed var(--rule); padding: 28px 20px; text-align: center; color: var(--ink-soft); }
+.empty h2 { font-family: var(--f-display); font-weight: 400; color: var(--ink); margin: 0 0 6px; }
+.empty p { margin: 0 0 12px; }

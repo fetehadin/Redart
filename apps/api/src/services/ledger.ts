@@ -1,12 +1,13 @@
 // A member's ledger in Postgres: read it as a LedgerState, change it by applying LedgerOps.
 import {
-  articleKey, articlesFromRows, diffDays, moveKeepingDates, sanitizeState, STARTER, urlKey, uid,
+  articleKey, articlesFromRows, diffDays, moveKeepingDates, newArticle, nextDueDate, sanitizeState, STARTER, urlKey, uid,
   type Article, type Favorite, type ISODate, type LedgerOpInput, type LedgerState, type LinkCheck, type Plan,
 } from "@redart/shared";
 import type { Db, Tx } from "../db";
 import { Prisma, type LinkStatus as DbLinkStatus } from "../generated/prisma/client";
 import { fromDbDate, toDbDate } from "../lib/dates";
 import { HttpError } from "../middleware/errors";
+import { clearFavorited, clearFinished, recordFavorited, recordFinished, recordStartedPlan } from "./activity";
 
 type DbArticle = Prisma.ArticleGetPayload<object>;
 type DbFavorite = Prisma.FavoriteGetPayload<object>;
@@ -126,6 +127,7 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
     case "plan.create": {
       if (await tx.plan.findUnique({ where: { id: op.plan.id }, select: { id: true } })) return; // replayed op
       await insertPlan(tx, userId, op.plan).catch(rethrowConflict);
+      await recordStartedPlan(tx, userId, { id: op.plan.id, name: op.plan.name, days: op.plan.days, articles: op.plan.articles.length });
       return;
     }
     case "plan.update": {
@@ -178,14 +180,18 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
       return;
     }
     case "article.update": {
-      await ownedPlan(tx, userId, op.planId);
-      const r = await tx.article.updateMany({ where: { id: op.articleId, planId: op.planId }, data: articleColumns(op.patch) as Prisma.ArticleUncheckedUpdateManyInput });
-      if (!r.count) throw new HttpError(404, "NOT_FOUND", "That article doesn't exist anymore.");
+      const plan = await ownedPlan(tx, userId, op.planId);
+      const before = await tx.article.findFirst({ where: { id: op.articleId, planId: op.planId }, select: { done: true } });
+      if (!before) throw new HttpError(404, "NOT_FOUND", "That article doesn't exist anymore.");
+      const after = await tx.article.update({ where: { id: op.articleId }, data: articleColumns(op.patch) });
+      if (after.done && !before.done) await recordFinished(tx, userId, plan.id, after, plan.name);
+      if (!after.done && before.done) await clearFinished(tx, after.id);
       return;
     }
     case "article.remove": {
       await ownedPlan(tx, userId, op.planId);
-      await tx.article.deleteMany({ where: { id: op.articleId, planId: op.planId } });
+      const r = await tx.article.deleteMany({ where: { id: op.articleId, planId: op.planId } });
+      if (r.count) await clearFinished(tx, op.articleId);
       return;
     }
     case "article.move": {
@@ -206,7 +212,9 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
       const key = articleKey(op.favorite);
       const exists = await tx.favorite.findFirst({ where: { OR: [{ id: op.favorite.id }, { userId, articleKey: key }] }, select: { id: true, userId: true } });
       if (exists) { if (exists.userId !== userId) throw new HttpError(409, "CONFLICT", "That favourite already exists."); return; }
-      await tx.favorite.create({ data: favoriteRow(userId, op.favorite) }).catch(rethrowConflict);
+      const row = favoriteRow(userId, op.favorite);
+      await tx.favorite.create({ data: row }).catch(rethrowConflict);
+      await recordFavorited(tx, userId, { articleKey: row.articleKey, title: row.title, url: row.url ?? "", minutes: row.minutes, topic: row.topic ?? "" });
       return;
     }
     case "favorite.update": {
@@ -217,7 +225,10 @@ async function applyOne(tx: Tx, userId: string, op: LedgerOpInput, today: ISODat
       return;
     }
     case "favorite.remove": {
-      await tx.favorite.deleteMany({ where: { id: op.favoriteId, userId } });
+      const f = await tx.favorite.findFirst({ where: { id: op.favoriteId, userId }, select: { id: true, articleKey: true } });
+      if (!f) return;
+      await tx.favorite.delete({ where: { id: f.id } });
+      await clearFavorited(tx, userId, f.articleKey);
       return;
     }
     case "prefs.theme":
@@ -299,4 +310,21 @@ export async function importLedger(db: Db, userId: string, raw: unknown, today: 
     summary.favoritesAdded = newFavs.length;
   }, { timeout: 30_000 });
   return summary;
+}
+
+/* ---------- one-click "add to my plan" from the feed or inbox ---------- */
+
+export interface QuickAdd { url: string; title: string; minutes?: number | null; topic?: string }
+
+/** Add an article to the member's active plan, after its last one. Adding the same link twice is a no-op. */
+export async function quickAdd(db: Db, userId: string, input: QuickAdd, today: ISODate): Promise<{ planName: string; due: ISODate; duplicate: boolean }> {
+  const state = await loadLedger(db, userId, today);
+  const plan = state.plans.find((p) => p.id === state.active)!;
+  const key = urlKey(input.url);
+  const existing = key ? plan.articles.find((a) => urlKey(a.url) === key) : undefined;
+  if (existing) return { planName: plan.name, due: existing.due, duplicate: true };
+  const due = nextDueDate(plan, today);
+  const a = newArticle({ title: input.title, url: input.url, topic: input.topic ?? "", minutes: input.minutes ?? 10, minutesAuto: input.minutes == null, due }, plan.start);
+  await db.$transaction((tx) => applyOne(tx, userId, { type: "article.add", planId: plan.id, article: a }, today));
+  return { planName: plan.name, due, duplicate: false };
 }

@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, serverApi } from "@/lib/session";
 import "@/styles/globals.css";
 
 const display = Libre_Caslon_Text({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-display", display: "swap" });
@@ -39,6 +39,7 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   const member = await getCurrentUser();
+  const unread = member ? (await serverApi<{ count: number }>("/api/notifications/unread-count")).data?.count ?? 0 : 0;
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
@@ -48,7 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a className="skip" href="#main">Skip to content</a>
         <ToastProvider>
           <div className="wrap">
-            <SiteHeader member={member} />
+            <SiteHeader member={member} unread={unread} />
             <main className="wrap page" id="main">{children}</main>
             <SiteFooter />
           </div>

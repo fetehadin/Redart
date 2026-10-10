@@ -1,0 +1,4 @@
+.panel { border: 1px solid var(--rule); background: var(--paper); padding: 12px; display: flex; flex-direction: column; gap: 10px; margin-left: 30px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field textarea { width: 100%; resize: vertical; }
+@media (max-width: 600px) { .panel { margin-left: 0; } }

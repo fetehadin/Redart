@@ -4,6 +4,7 @@ import { articleKey, LIMITS, parseISO, safeUrl, scheduleStatus, urlKey, type Art
 import { fmtDate } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { useLedgerApi } from "./LedgerContext";
+import { RecommendPanel } from "../social/RecommendPanel";
 import type { Filter } from "./Toolbar";
 import s from "./Ledger.module.css";
 
@@ -74,7 +75,8 @@ interface RowProps {
 }
 
 function ArticleRow({ a, index, searching, confirming, onEdit, onConfirm }: RowProps) {
-  const { plan, today, checking, favKeys, toggleDone, toggleFav, setDue, setNotes, move, removeArticle, recheck } = useLedgerApi();
+  const { plan, today, checking, favKeys, member, toggleDone, toggleFav, setDue, setNotes, move, removeArticle, recheck } = useLedgerApi();
+  const [recommending, setRecommending] = useState(false);
   const sch = scheduleStatus(a, today);
   const fav = favKeys.has(articleKey(a));
   const isChecking = checking.has(a.id);
@@ -105,6 +107,7 @@ function ArticleRow({ a, index, searching, confirming, onEdit, onConfirm }: RowP
           <textarea id={"note-" + a.id} placeholder="Your note: what you learned, and one thing to apply…" aria-label={"Notes for " + a.title}
             maxLength={LIMITS.notes} value={a.notes} onChange={(e) => setNotes(a.id, e.target.value)} />
         </div>
+        {recommending && member ? <RecommendPanel handle={member.handle} article={a} onClose={() => setRecommending(false)} /> : null}
       </div>
       {confirming ? (
         <div className={s.actions}>
@@ -117,6 +120,7 @@ function ArticleRow({ a, index, searching, confirming, onEdit, onConfirm }: RowP
         <div className={s.actions}>
           <button className={s.icon} type="button" aria-label={"Edit " + a.title} onClick={onEdit}>Edit</button>
           {a.url ? <button className={s.icon} type="button" title="Check the link again" disabled={isChecking} onClick={() => recheck(a.id)}>Recheck</button> : null}
+          {a.url && member ? <button className={s.icon} type="button" aria-expanded={recommending} aria-label={"Recommend " + a.title} onClick={() => setRecommending((v) => !v)}>Recommend</button> : null}
           <button className={s.icon} type="button" title="Move up" aria-label="Move up" disabled={index === 0 || searching} onClick={() => move(index, -1)}>▲</button>
           <button className={s.icon} type="button" title="Move down" aria-label="Move down" disabled={index === plan.articles.length - 1 || searching} onClick={() => move(index, 1)}>▼</button>
           <button className={s.icon} type="button" aria-label={"Remove " + a.title} onClick={() => onConfirm(true)}>Remove</button>

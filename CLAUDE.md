@@ -41,7 +41,7 @@ Everything the current version does carries over. The behaviour is specified in 
 - **Follow:** an asymmetric follow, like Twitter. Following a `PRIVATE` account creates a `PENDING` request that the owner accepts or declines. You can remove a follower.
 - **Profile `/u/[handle]`:** display name, bio, follower and following counts, articles read and minutes read (all time and this month), current visible plans with progress bars, favourites, challenges joined, and recent finished articles. A private account shows only the header to non-followers. Guests (not signed in) see only the header of any profile. Hidden plans (`plan.setShared`) and everything finished in them never count or show for others.
 - **People `/people`:** search by name or @handle, and pending follow requests to accept or decline.
-- **Feed `/feed`:** what the people you follow have finished, favourited, recommended, joined (challenges) and started (plans). Strictly newest first, cursor-paginated (20 per page). No ranking algorithm.
+- **Feed `/feed`:** what the people you follow have finished, favourited, recommended, joined (challenges) and started (plans). Strictly newest first, cursor-paginated (20 per page). No ranking algorithm. Activity rows are written as side effects of ledger ops (`services/activity.ts`) and removed again on undo (unticking, unfavouriting, removing an article).
 - **Recommend:** share an article (link + an optional message ≤280) either to all followers (it shows in the feed) or directly to one user who follows you (it shows in `/inbox`). One click adds a recommendation to any of your plans.
 - **Notifications** (`/inbox`, unread count in the nav): new follower, follow request, follow accepted, direct recommendation. Shown in-app only; no email in v1.
 
@@ -230,9 +230,10 @@ This is the authoritative shape. Write the real `schema.prisma` from it with pro
 | users | `GET /users/:handle` (header for everyone; stats only when `canSeeReading`), `GET /users/:handle/plans`, `GET /users/:handle/finished`, `GET /users/:handle/favorites`, `GET /users/:handle/followers`, `GET /users/:handle/following`, `GET /users/search?q=` (members) |
 | follows | `POST /users/:handle/follow`, `DELETE /users/:handle/follow`, `GET /follow-requests`, `POST /follow-requests/:handle/accept`, `POST /follow-requests/:handle/decline`, `DELETE /followers/:handle` |
 | blocks | `POST /users/:handle/block`, `DELETE /users/:handle/block`, `GET /blocks` |
-| feed | `GET /feed` |
-| recommendations | `POST /recommendations`, `GET /inbox/recommendations` |
-| notifications | `GET /notifications`, `POST /notifications/read` |
+| feed | `GET /feed` (followed members' activity, newest first; activity from hidden plans never shows) |
+| recommendations | `POST /recommendations` (`toHandle` only for someone who follows you; omitted = all followers' feeds), `GET /inbox/recommendations` |
+| notifications | `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/read` |
+| quick add | `POST /ledger/quick-add` (feed/inbox "Add to my plan": appends to the active plan; same link twice is a no-op) |
 | challenges | `GET /challenges?when=current\|upcoming\|past`, `POST /challenges`, `GET /challenges/:slug`, `PATCH /challenges/:slug`, `POST /challenges/:slug/join` `{ trackId, inviteCode? }`, `POST /challenges/:slug/track`, `DELETE /challenges/:slug/join`, `GET /challenges/:slug/leaderboard`, `PATCH /challenges/:slug/me` `{ showOnLeaderboard }` |
 | inspect | `GET /inspect?url=` (open to guests; reads and writes the `Link` cache, 12 h for OK results) |
 | health | `GET /health` (DB ping, used by Docker healthcheck) |

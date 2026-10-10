@@ -4,7 +4,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { AccountMenu } from "./AccountMenu";
 import styles from "./SiteHeader.module.css";
 
-export function SiteHeader({ member }: { member: Me | null }) {
+export function SiteHeader({ member, unread = 0 }: { member: Me | null; unread?: number }) {
   return (
     <header className={styles.masthead}>
       <div className={styles.brand}>
@@ -18,7 +18,13 @@ export function SiteHeader({ member }: { member: Me | null }) {
       </div>
       <nav className={styles.nav} aria-label="Site">
         <Link href="/" className={styles.link}>Ledger</Link>
+        {member ? <Link href="/feed" className={styles.link}>Feed</Link> : null}
         {member ? <Link href="/people" className={styles.link}>People</Link> : null}
+        {member ? (
+          <Link href="/inbox" className={styles.link} aria-label={unread ? `Inbox, ${unread} new` : "Inbox"}>
+            Inbox{unread ? <span className={styles.badge} aria-hidden="true">{unread > 99 ? "99+" : unread}</span> : null}
+          </Link>
+        ) : null}
         {member ? <AccountMenu member={member} /> : <Link href="/signin" className="btn">Sign in</Link>}
         <ThemeToggle />
       </nav>

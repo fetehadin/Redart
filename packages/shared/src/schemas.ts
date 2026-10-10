@@ -107,3 +107,21 @@ export const importBody = z.object({ state: z.unknown() });
 export type LedgerOpInput = z.infer<typeof ledgerOpSchema>;
 
 export const searchQuery = z.object({ q: z.string().trim().min(1).max(50) });
+
+export const RECOMMEND_MESSAGE_MAX = 280;
+export const recommendBody = z.object({
+  url: z.string().trim().max(2048).refine((s) => safeUrl(s) !== null, "Use a full http(s) link.").transform((s) => safeUrl(s)!),
+  title: z.string().trim().min(1).max(LIMITS.title),
+  minutes: z.number().int().min(LIMITS.minMinutes).max(LIMITS.maxMinutes).nullable().optional(),
+  topic: z.string().trim().max(LIMITS.topic).optional(),
+  message: z.string().trim().max(RECOMMEND_MESSAGE_MAX).optional(),
+  /** Omit to share with all followers. */
+  toHandle: z.string().trim().toLowerCase().max(ACCOUNT_LIMITS.handleMax).optional(),
+});
+
+export const quickAddBody = z.object({
+  url: z.string().trim().max(2048).refine((s) => s === "" || safeUrl(s) !== null, "Use a full http(s) link."),
+  title: z.string().trim().min(1).max(LIMITS.title),
+  minutes: z.number().int().min(LIMITS.minMinutes).max(LIMITS.maxMinutes).nullable().optional(),
+  topic: z.string().trim().max(LIMITS.topic).optional(),
+});

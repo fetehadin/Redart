@@ -10,3 +10,4 @@
 .nav { flex-wrap: wrap; }
 .link { font-weight: 600; text-decoration: none; padding: 6px 4px; }
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.badge { display: inline-block; margin-left: 4px; min-width: 1.4em; padding: 0 5px; border-radius: 999px; background: var(--margin); color: var(--card); font-size: .72rem; font-weight: 700; text-align: center; line-height: 1.5; vertical-align: 1px; }
