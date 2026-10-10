@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "true",
+  "buildCommand": "true",
+  "outputDirectory": "deploy/vercel",
+  "redirects": [
+    { "source": "/:path*", "destination": "https://redart.169-58-96-52.sslip.io/:path*", "permanent": false }
+  ]
+}

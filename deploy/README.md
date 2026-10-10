@@ -113,3 +113,7 @@ On the current VPS, another app (TajStore, in `/opt/tajstore`) already runs a Ca
   ```bash
   docker exec -i tajstore-caddy-1 sh -c 'cat > /tmp/Caddyfile.new && caddy validate --config /tmp/Caddyfile.new --adapter caddyfile && caddy reload --config /tmp/Caddyfile.new --adapter caddyfile' < /opt/tajstore/Caddyfile
   ```
+
+## The old Vercel project
+
+Redart v2 needs the API and Postgres, so it doesn't run on Vercel. `vercel.json` makes the Vercel project skip the build and forward every path to the live site (a temporary 307, so it's easy to change). `deploy/vercel/index.html` is a fallback page with a link. If Redart gets its own domain, update the destination in both files.
