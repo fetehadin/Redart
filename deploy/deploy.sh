@@ -8,6 +8,8 @@ cd "$(git rev-parse --show-toplevel)"
 : "${DEPLOY_HOST:?Set DEPLOY_HOST in .env.deploy}"
 DEPLOY_USER="${DEPLOY_USER:-deploy}"
 APP_DIR=/srv/redart
+# docker-compose.yml (own Caddy) or docker-compose.behind-proxy.yml (another proxy owns 80/443)
+COMPOSE_FILE_NAME="${COMPOSE_FILE_NAME:-docker-compose.yml}"
 TARGET="$DEPLOY_USER@$DEPLOY_HOST"
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -24,8 +26,8 @@ ssh "$TARGET" bash -se <<REMOTE
 set -euo pipefail
 cd '$RELEASE'
 grep -q '^DOMAIN=CHANGE_ME' $APP_DIR/.env && { echo "Set DOMAIN in $APP_DIR/.env first."; exit 1; }
-docker compose --env-file $APP_DIR/.env -f deploy/docker-compose.yml build
-docker compose --env-file $APP_DIR/.env -f deploy/docker-compose.yml up -d --remove-orphans --wait --wait-timeout 300
+docker compose --env-file $APP_DIR/.env -f deploy/$COMPOSE_FILE_NAME build
+docker compose --env-file $APP_DIR/.env -f deploy/$COMPOSE_FILE_NAME up -d --remove-orphans --wait --wait-timeout 300
 ln -sfn '$RELEASE' $APP_DIR/current
 ls -1dt $APP_DIR/releases/* | tail -n +6 | xargs -r rm -rf
 docker image prune -f >/dev/null
@@ -38,5 +40,5 @@ for i in 1 2 3 4 5 6; do
   sleep 10
 done
 echo "The containers are up, but https://$DOMAIN isn't answering yet. If this is the first deploy, DNS or the certificate may still be settling." >&2
-echo "Logs: ssh $TARGET 'cd $APP_DIR/current && docker compose --env-file $APP_DIR/.env -f deploy/docker-compose.yml logs --tail 100'" >&2
+echo "Logs: ssh $TARGET 'cd $APP_DIR/current && docker compose --env-file $APP_DIR/.env -f deploy/$COMPOSE_FILE_NAME logs --tail 100'" >&2
 exit 1

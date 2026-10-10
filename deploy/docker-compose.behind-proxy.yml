@@ -1,0 +1,72 @@
+# Redart on a server where another app's reverse proxy already owns ports 80/443.
+# No Caddy here and no published ports: web and api join the proxy's Docker network under names
+# that can't clash with the other app's services (redart-web, redart-api), and that proxy routes
+# Redart's domain to them. The database stays on Redart's private network.
+#   docker compose --env-file /srv/redart/.env -f deploy/docker-compose.behind-proxy.yml up -d --build
+name: redart
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  redart-web:
+    build: { context: .., dockerfile: deploy/web.Dockerfile }
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: https://${DOMAIN:?set DOMAIN}
+      INTERNAL_API_URL: http://redart-api:4000
+      API_ORIGIN: http://redart-api:4000
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-redart_session}
+    networks: [internal, proxy]
+    depends_on:
+      redart-api: { condition: service_healthy }
+    logging: *logging
+
+  redart-api:
+    build: { context: .., dockerfile: deploy/api.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TRUST_PROXY: "1"
+      APP_ORIGIN: https://${DOMAIN}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-redart}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@redart-db:5432/${POSTGRES_DB:-redart}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-redart_session}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    networks: [internal, proxy]
+    depends_on:
+      redart-db: { condition: service_healthy }
+    logging: *logging
+
+  redart-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-redart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-redart}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+networks:
+  internal: {}
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?set PROXY_NETWORK to the reverse proxy's Docker network}
+
+volumes:
+  pgdata:
