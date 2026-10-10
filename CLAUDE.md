@@ -270,25 +270,22 @@ Every ledger change is a typed `LedgerOp` (`packages/shared/src/ledger.ts`) appl
 
 **Server:** Contabo VPS running Ubuntu 24.04 LTS. `DEPLOY_HOST`, `DEPLOY_USER` and `DOMAIN` live in the local `.env.deploy`, never in the repo.
 
-**One-time server setup** (document it in `deploy/README.md` and do it with the user):
-1. Create a non-root `deploy` user with sudo, set up SSH key login, and disable root and password SSH login.
-2. `ufw allow OpenSSH, 80, 443`, then `ufw enable`. Install `fail2ban` and unattended-upgrades.
-3. Install Docker Engine + Compose plugin and add `deploy` to the `docker` group.
-4. Point the domain's A (and AAAA) record at the VPS IP.
-5. Run `git clone` into `/srv/redart` and create `/srv/redart/.env` from `.env.example`.
+**One-time server setup:** `deploy/server-setup.sh`, run as root once. It installs updates, Docker, ufw (22/80/443), fail2ban and swap; creates the `deploy` user with your key and disables root and password SSH only once that works; creates `/srv/redart/.env` with a generated DB password; and installs the nightly backup cron. Step-by-step in `deploy/README.md`.
 
-**Production compose (`deploy/docker-compose.yml`):**
-- `caddy`: ports 80/443, automatic Let's Encrypt for `$DOMAIN`, `/api/*` to `api:4000` and everything else to `web:3000`, zstd/gzip, volumes for certificates
-- `web`: Next.js `standalone` build (the Dockerfile sets `NEXT_OUTPUT=standalone`; copy `.next/static` and `public` next to `server.js`), non-root, `INTERNAL_API_URL=http://api:4000`
-- `api`: runs `prisma migrate deploy` on start, then `node dist/index.js`; non-root; healthcheck on `/api/health`
-- `db`: `postgres:17-alpine`, named volume, **no published ports**, healthcheck
+**Production compose (`deploy/docker-compose.yml`, project name `redart`):**
+- `caddy`: ports 80/443, automatic Let's Encrypt for `$DOMAIN`, `/api/*` to `api:4000` and everything else to `web:3000`, zstd/gzip, HSTS, `www` redirect. Upstream keep-alive is 30 s, below the apps' 65 s, to avoid "socket hang up" races.
+- `web`: Next.js standalone (`NEXT_OUTPUT=standalone` at build time), non-root, healthcheck.
+- `api`: `deploy/api-start.sh` runs `prisma migrate deploy`, then the tsup bundle; production deps only; non-root; healthcheck on `/api/health`; `TRUST_PROXY=1`.
+- `db`: `postgres:17-alpine`, `pgdata` volume, **no published ports**, healthcheck.
 - Every service has `restart: unless-stopped` and log rotation (`max-size: 10m`, `max-file: 3`).
 
-**Deploy (`deploy/deploy.sh`):** `ssh` in, `git pull`, `docker compose up -d --build`, `docker image prune -f`, then curl `/api/health`. GitHub Actions CI comes later: build images, push to GHCR, pull on the server.
+**Deploy (`deploy/deploy.sh`, run on your machine):** refuses if there are uncommitted changes; `git archive HEAD` over SSH into `/srv/redart/releases/<time>-<sha>`; `docker compose build` and `up -d --wait`; point `/srv/redart/current` at it; keep 5 releases; check `https://$DOMAIN/api/health`. The server needs no GitHub access. `DEPLOY_HOST`/`DEPLOY_USER` come from the git-ignored `.env.deploy`.
 
-**Backups (`deploy/backup.sh`):** a nightly cron runs `pg_dump -Fc` to `/srv/backups`, keeps 14 days, and is meant to be copied offsite. Test a restore once.
+**Backups:** `deploy/backup.sh` runs nightly at 03:15 (`pg_dump -Fc` to `/srv/backups/redart`, 14 days kept). `deploy/restore.sh <file>` asks for confirmation, then replaces the live DB. Copy backups off the server.
 
-**Rules for Claude on the server:** confirm with the user before **any** SSH command or deploy. Never run destructive commands (`docker volume rm`, `docker system prune -a`, `DROP`, `prisma migrate reset`, deleting backups) on the server without explicit approval of that specific command.
+**CI:** `.github/workflows/ci.yml` runs typecheck, lint, tests (Postgres service via `TEST_DATABASE_URL`), build, and e2e on every push and PR.
+
+**Rules for Claude on the server:** confirm with the user before **any** SSH command or deploy. Never run destructive commands (`docker volume rm`, `docker system prune -a`, `DROP`, `prisma migrate reset`, `restore.sh`, deleting backups) on the server without explicit approval of that specific command.
 
 ### Environment variables
 ```
@@ -300,9 +297,9 @@ SMTP_HOST= SMTP_PORT= SMTP_USER= SMTP_PASS= SMTP_FROM=      # optional
 ADMIN_EMAILS=                                              # comma list, made admin on signup
 # web
 INTERNAL_API_URL=http://api:4000
-NEXT_PUBLIC_APP_NAME=Redart
 # db
 POSTGRES_USER=redart POSTGRES_PASSWORD=*** POSTGRES_DB=redart
+# production: the full list is deploy/env.production.example (copied to /srv/redart/.env)
 ```
 
 ## 9. UI: make it feel natural
