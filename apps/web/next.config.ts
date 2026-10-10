@@ -1,0 +1,30 @@
+import path from "node:path";
+import type { NextConfig } from "next";
+
+// In production Caddy sends /api/* straight to Express; this rewrite is for `pnpm dev`.
+const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:4000";
+
+const config: NextConfig = {
+  // The Docker image (phase 6) sets NEXT_OUTPUT=standalone; `next start` needs the default output.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
+  outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
+  transpilePackages: ["@redart/shared"],
+  poweredByHeader: false,
+  reactStrictMode: true,
+  async rewrites() {
+    return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }];
+  },
+  async headers() {
+    return [{
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+      ],
+    }];
+  },
+};
+
+export default config;

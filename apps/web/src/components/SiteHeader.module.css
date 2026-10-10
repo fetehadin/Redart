@@ -1,0 +1,9 @@
+.masthead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+.brand { min-width: 0; flex: 1 1 320px; }
+.home {
+  font-family: var(--f-display); font-weight: 700; font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.05;
+  display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink);
+}
+.mark { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; border: 2px solid var(--margin); color: var(--margin); font-size: .62em; border-radius: 2px; font-style: italic; }
+.brand p { margin: 6px 0 0; color: var(--ink-soft); max-width: 62ch; }
+.nav { display: flex; gap: 8px; align-items: center; }
